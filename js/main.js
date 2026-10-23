@@ -15,8 +15,6 @@ function resetWorld(newSeed){
   player = makeBody(px, py, 0.28, 1.0);
   player.hp=100; player.hunger=20; player.thirst=15; player.stamina=100; player.tx=px; player.ty=py;
   player.shootCd = 0;
-  
-  // --- NOVO: Armas Iniciais ---
   player.equippedWeapon = 'pistol';
   player.ammo = 999;
 
@@ -41,6 +39,7 @@ function loop(now){
     while(simAccum>=SIM_DT && ticks<8){ simulate(1); simAccum-=SIM_DT; ticks++; }
     if(ticks>=8) simAccum=0;
     ensureChunks();
+    
     const dtSec=dtMs/1000;
     let ax=0, ay=0;
     if(keys['KeyW']||keys['ArrowUp']) ay-=1;
@@ -52,13 +51,17 @@ function loop(now){
       const ddx=player.tx-player.x, ddy=player.ty-player.y, dd=Math.hypot(ddx,ddy);
       if(dd>0.2){ ax=ddx/dd*PLAYER_ACCEL*0.8; ay=ddy/dd*PLAYER_ACCEL*0.8; }
     }
+    
     stepBody(player, ax, ay, PLAYER_MAX_V, dtSec);
+    
     if (player.shootCd > 0) player.shootCd -= dtSec;
     player.hunger=clamp(player.hunger+0.004*dtMs*speed,0,100);
     player.thirst=clamp(player.thirst+0.006*dtMs*speed,0,100);
     if(player.hunger>=90||player.thirst>=90) player.hp=clamp(player.hp-0.02*dtMs*speed,0,100);
     player.stamina=clamp(player.stamina+0.1*dtMs,0,100);
+    
     separateBodies([player].concat(animals).concat(zombies));
+    
     const iso=gridToIso(player.x,player.y);
     camX=lerp(camX, canvas.width/2-iso.x*zoom, 0.06);
     camY=lerp(camY, canvas.height/2-iso.y*zoom-40*zoom, 0.06);
@@ -69,9 +72,16 @@ function loop(now){
 
 function init(){
   canvas=document.getElementById('gameCanvas');
-  ctx=canvas.getContext('2d');
-  function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+  ctx=canvas.getContext('2d', { alpha: false });
+  ctx.imageSmoothingEnabled = false; // DESATIVA O ANTI-ALIASING
+  
+  function resize(){ 
+    canvas.width=window.innerWidth; 
+    canvas.height=window.innerHeight; 
+    ctx.imageSmoothingEnabled = false;
+  }
   resize(); window.addEventListener('resize', resize);
+  
   bindInput();
   document.getElementById('startBtn').addEventListener('click', ()=>{
     document.getElementById('startScreen').classList.add('hidden');
