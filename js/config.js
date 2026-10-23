@@ -1,5 +1,5 @@
 /* ============================================================
-   ECOZUMBI — Configuração global, constantes, estado e utilitários
+   ECOZUMBI — Configuração global
    ============================================================ */
 
 const TW = 64, TH = 32;
@@ -40,7 +40,7 @@ let corpses = [];
 let bodyParts = [];
 let projectiles = [];
 let particles = [];
-let lootDrops = []; // NOVO: Array de loot no chão
+let lootDrops = [];
 let campfires = [];
 let player = null;
 let inventory = { wood:15, stone:8, food:6, seeds:12 };
@@ -64,6 +64,7 @@ let audioCtx = null;
 let zombieSpawnTimer = 0;
 let hitFlashTimer = 0;
 
+// Utilitários
 function hash2(x, y){ const s = Math.sin(x*127.1 + y*311.7 + worldSeed*0.013)*43758.5453; return s - Math.floor(s); }
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 function lerp(a,b,t){ return a+(b-a)*t; }
