@@ -1,7 +1,3 @@
-/* ============================================================
-   Animais, zumbis, corpos e desmembramento
-   ============================================================ */
-
 function spawnCorpse(x, y, vx, vy, kind, species){
   corpses.push({ x, y, vx:vx*0.6+(Math.random()-0.5)*2, vy:vy*0.6+(Math.random()-0.5)*2,
     angle: Math.random()*Math.PI*2, vr:(Math.random()-0.5)*8, kind, species, life: 600 });
@@ -39,6 +35,16 @@ function spawnDismemberment(x, y, vx, vy, isZombie) {
   }
 }
 
+// NOVO: Função para dropar itens
+function spawnLoot(x, y, type, amount = 1) {
+  lootDrops.push({ 
+    x, y, 
+    type, // 'pistol', 'rifle', 'shotgun', 'ammo_pistol', 'ammo_rifle', 'ammo_shotgun'
+    amount,
+    id: Math.random()
+  });
+}
+
 const SPECIES_CFG = {
   deer:   { herbivore:true,  radius:0.35, mass:1.2, color:'#8b5a2b', maxAge:120, reproRate:0.004, preyOf:'wolf' },
   rabbit: { herbivore:true,  radius:0.22, mass:0.5, color:'#a8a29e', maxAge:60,  reproRate:0.012, preyOf:'fox' },
@@ -59,10 +65,20 @@ function makeZombie(x, y){
 }
 
 function spawnInitialFauna(cx, cy){
-  animals = []; zombies = []; corpses = []; bodyParts = []; projectiles = [];
+  animals = []; zombies = []; corpses = []; bodyParts = []; projectiles = []; lootDrops = [];
   for(let i=0;i<6;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*20, cy+(Math.random()-0.5)*20, 'deer'));
   for(let i=0;i<10;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*25, cy+(Math.random()-0.5)*25, 'rabbit'));
   for(let i=0;i<3;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*30, cy+(Math.random()-0.5)*30, 'fox'));
   for(let i=0;i<2;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*35, cy+(Math.random()-0.5)*35, 'wolf'));
   for(let i=0;i<4;i++) zombies.push(makeZombie(cx+(Math.random()-0.5)*40, cy+(Math.random()-0.5)*40));
+
+  // Spawn de armas iniciais perto do centro
+  spawnLoot(cx + 2, cy - 1, 'pistol', 1);
+  spawnLoot(cx + 2.5, cy - 1, 'ammo_pistol', 24);
+  
+  spawnLoot(cx - 3, cy + 3, 'shotgun', 1);
+  spawnLoot(cx - 3.5, cy + 3, 'ammo_shotgun', 8);
+
+  spawnLoot(cx + 5, cy + 4, 'rifle', 1);
+  spawnLoot(cx + 5.5, cy + 4, 'ammo_rifle', 10);
 }
