@@ -1,152 +1,150 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ECOZUMBI — Física + Desmembramento + Loot</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Karla:wght@300;400;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ECOZUMBI — Terras perdidas</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<canvas id="gameCanvas" class="absolute inset-0" style="cursor:crosshair;"></canvas>
-<div id="hitFlash"></div>
-
-<div id="hudTop" class="hidden absolute top-3 left-3 right-3 z-20 flex flex-wrap justify-between items-start gap-3 pointer-events-none">
-  <div class="pz-panel p-3 pointer-events-auto flex items-center gap-4 flex-wrap">
-    <div class="flex flex-col gap-1.5" style="min-width:130px">
-      <div>
-        <div class="flex justify-between stat-label mb-1"><span style="color:#f87171"><i class="fa-solid fa-heart mr-1"></i>Vida</span><span id="hpVal">100%</span></div>
-        <div class="bar"><div id="hpBar" style="width:100%;background:linear-gradient(90deg,#7f1d1d,#ef4444)"></div></div>
-      </div>
-      <div>
-        <div class="flex justify-between stat-label mb-1"><span style="color:#fbbf24"><i class="fa-solid fa-utensils mr-1"></i>Fome</span><span id="hungerVal">85%</span></div>
-        <div class="bar"><div id="hungerBar" style="width:85%;background:linear-gradient(90deg,#92400e,#f59e0b)"></div></div>
-      </div>
-    </div>
-    <div class="flex flex-col gap-1.5" style="min-width:130px">
-      <div>
-        <div class="flex justify-between stat-label mb-1"><span style="color:#38bdf8"><i class="fa-solid fa-droplet mr-1"></i>Sede</span><span id="thirstVal">90%</span></div>
-        <div class="bar"><div id="thirstBar" style="width:90%;background:linear-gradient(90deg,#075985,#0ea5e9)"></div></div>
-      </div>
-      <div>
-        <div class="flex justify-between stat-label mb-1"><span style="color:#34d399"><i class="fa-solid fa-bolt mr-1"></i>Energia</span><span id="staminaVal">100%</span></div>
-        <div class="bar"><div id="staminaBar" style="width:100%;background:linear-gradient(90deg,#065f46,#10b981)"></div></div>
-      </div>
-    </div>
-    <div style="width:1px;height:36px;background:#24303c"></div>
-    <div class="flex flex-col gap-1" style="font-size:11px">
-      <span id="weaponName" style="color:#9aa7b2;font-weight:bold;letter-spacing:.05em">SEM ARMA</span>
-      <span style="color:#e5e7eb"><i class="fa-solid fa-box-archive mr-1" style="color:#fbbf24"></i><span id="ammoCount">0</span> balas</span>
-    </div>
-    <div style="width:1px;height:36px;background:#24303c"></div>
-    <div class="grid grid-cols-2 gap-1.5" style="font-size:11px">
-      <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-tree" style="color:#b45309"></i><span id="invWood" class="font-bold">15</span></div>
-      <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-cube" style="color:#9ca3af"></i><span id="invStone" class="font-bold">8</span></div>
-      <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-apple-whole" style="color:#f87171"></i><span id="invFood" class="font-bold">6</span></div>
-      <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-seedling" style="color:#a3e635"></i><span id="invSeeds" class="font-bold">12</span></div>
-    </div>
-  </div>
-  <div class="pz-panel p-3 pointer-events-auto flex items-center gap-3 flex-wrap">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <i id="timeIcon" class="fa-solid fa-sun" style="color:#fbbf24"></i>
-        <span id="clockText" class="cinzel font-bold" style="color:#fcd34d;font-size:15px">08:00</span>
-        <span id="dayText" style="color:#9aa7b2;font-size:12px">Dia 1</span>
-        <span id="seasonText" style="color:#86efac;font-size:11px;font-weight:700">Primavera</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#c2cbd4;margin-top:2px">
-        <i id="weatherIcon" class="fa-solid fa-cloud-sun" style="color:#7dd3fc"></i>
-        <span id="weatherText">Ensolarado</span>
-        <span id="tempText" style="color:#9aa7b2">18°C</span>
-        <span style="color:#9aa7b2">|</span>
-        <i class="fa-solid fa-wind" style="color:#94a3b8"></i>
-        <span id="windText" class="wind-arrow" style="color:#cbd5e1">→ 6 km/h</span>
-      </div>
-    </div>
-    <div style="width:1px;height:32px;background:#24303c"></div>
-    <div style="display:flex;gap:4px;align-items:center">
-      <button id="btnPause" class="pz-btn p-2 rounded" title="Pausar"><i class="fa-solid fa-pause" style="color:#fbbf24"></i></button>
-      <button id="btnSpeed1" class="pz-btn active px-2.5 py-1.5 rounded text-xs font-bold" style="color:#34d399">1x</button>
-      <button id="btnSpeed2" class="pz-btn px-2.5 py-1.5 rounded text-xs font-bold" style="color:#38bdf8">2x</button>
-      <button id="btnSpeed5" class="pz-btn px-2.5 py-1.5 rounded text-xs font-bold" style="color:#c084fc">5x</button>
-    </div>
-    <div style="width:1px;height:32px;background:#24303c"></div>
-    <button id="btnAudio" class="pz-btn p-2 rounded" title="Som"><i class="fa-solid fa-volume-high"></i></button>
-    <button id="btnRegen" class="pz-btn p-2 rounded" title="Novo Mundo" style="color:#f87171"><i class="fa-solid fa-rotate"></i></button>
-  </div>
+<canvas id="game" aria-label="Jogo de sobrevivência isométrico, controlado por teclado e mouse">
+</canvas>
+<header>
+<div class="brand">
+<span class="eyebrow">SIMULAÇÃO DE SOBREVIVÊNCIA</span>
+<strong>ECO<span>ZUMBI</span>
+</strong>
+<small>TERRAS PERDIDAS / PIXEL EDITION</small>
 </div>
-
-<div id="ecoPanel" class="hidden absolute top-24 right-3 z-20 w-72 pz-panel p-3" style="font-size:11px">
-  <h3 class="cinzel font-bold pb-1.5 mb-2 flex items-center justify-between" style="color:#d9a441;border-bottom:1px solid #1f2a35;font-size:13px">
-    <span><i class="fa-solid fa-chart-line mr-1.5"></i>Ecossistema</span>
-    <span id="ecoHealthBadge" style="font-size:9px;padding:2px 7px;border-radius:8px;background:rgba(6,78,59,.5);color:#6ee7b7;border:1px solid #047857">Equilibrado</span>
-  </h3>
-  <div class="grid grid-cols-2 gap-1.5 mb-2">
-    <div style="background:rgba(10,14,18,.85);padding:7px;border-radius:3px;border:1px solid #1f2a35">
-      <span style="color:#7d8a96;display:block;font-size:9px;letter-spacing:.06em">BIOMASSA</span>
-      <b id="ecoBiomass" style="color:#4ade80;font-size:14px">0 t</b>
-    </div>
-    <div style="background:rgba(10,14,18,.85);padding:7px;border-radius:3px;border:1px solid #1f2a35">
-      <span style="color:#7d8a96;display:block;font-size:9px;letter-spacing:.06em">UMIDADE</span>
-      <b id="ecoMoisture" style="color:#38bdf8;font-size:14px">0%</b>
-    </div>
-    <div style="background:rgba(10,14,18,.85);padding:7px;border-radius:3px;border:1px solid #1f2a35">
-      <span style="color:#7d8a96;display:block;font-size:9px;letter-spacing:.06em">HERBÍVOROS</span>
-      <b id="ecoHerbivores" style="color:#fbbf24;font-size:14px">0</b>
-    </div>
-    <div style="background:rgba(10,14,18,.85);padding:7px;border-radius:3px;border:1px solid #1f2a35">
-      <span style="color:#7d8a96;display:block;font-size:9px;letter-spacing:.06em">INFECTADOS</span>
-      <b id="ecoZombies" style="color:#a3e635;font-size:14px">0</b>
-    </div>
-  </div>
-  <div id="speciesList" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"></div>
+<div class="time panel">
+<b id="clock">08:00</b>
+<span id="day">
+</span>
+<span id="weather">
+</span>
 </div>
-
-<div id="toolbar" class="hidden absolute bottom-4 left-1/2 z-20 pointer-events-none" style="transform:translateX(-50%);max-width:96vw">
-  <div class="pz-panel p-2 pointer-events-auto flex items-center gap-1.5" style="overflow-x:auto">
-    <button data-tool="inspect" class="tool-btn pz-btn active"><i class="fa-solid fa-magnifying-glass" style="color:#fbbf24"></i>Atirar / Inspec.</button>
-    <button data-tool="interact" class="tool-btn pz-btn"><i class="fa-solid fa-hand" style="color:#38bdf8"></i>Mover</button>
-    <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
-    <button data-tool="chop" class="tool-btn pz-btn"><i class="fa-solid fa-axe" style="color:#fb923c"></i>Machado</button>
-    <button data-tool="mine" class="tool-btn pz-btn"><i class="fa-solid fa-pickaxe" style="color:#d1d5db"></i>Picareta</button>
-    <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
-    <button data-tool="forage" class="tool-btn pz-btn"><i class="fa-solid fa-basket-shopping" style="color:#4ade80"></i>Coletar</button>
-    <button data-tool="plant" class="tool-btn pz-btn"><i class="fa-solid fa-wheat-awn" style="color:#facc15"></i>Plantar</button>
-    <button data-tool="water" class="tool-btn pz-btn"><i class="fa-solid fa-faucet-drip" style="color:#60a5fa"></i>Irrigar</button>
-    <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
-    <button data-tool="campfire" class="tool-btn pz-btn"><i class="fa-solid fa-fire" style="color:#f59e0b"></i>Fogueira</button>
-    <button data-tool="eat" class="tool-btn pz-btn"><i class="fa-solid fa-drumstick-bite" style="color:#fdba74"></i>Comer</button>
-    <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
-    <button data-tool="spawn_deer" class="tool-btn pz-btn"><i class="fa-solid fa-horse" style="color:#d97706"></i>+Veado</button>
-    <button data-tool="spawn_rabbit" class="tool-btn pz-btn"><i class="fa-solid fa-paw" style="color:#d1d5db"></i>+Coelho</button>
-    <button data-tool="spawn_zombie" class="tool-btn pz-btn"><i class="fa-solid fa-skull" style="color:#a3e635"></i>+Zumbi</button>
-  </div>
+</header>
+<section class="vitals panel" aria-label="Estado do jogador">
+<div>
+<label for="hp">VIDA <span id="hpText">
+</span>
+</label>
+<progress id="hp" max="100" value="100">
+</progress>
 </div>
-
-<div id="tooltip" class="pz-panel p-3 shadow-2xl">
-  <div id="ttTitle" class="cinzel font-bold mb-1" style="color:#fcd34d;font-size:13px">Tile</div>
-  <div id="ttSub" style="color:#8b97a3;font-size:10.5px;margin-bottom:8px"></div>
-  <div id="ttBody" style="display:flex;flex-direction:column;gap:3px;color:#cdd5dc;font-size:11px"></div>
+<div>
+<label for="food">SACIEDADE <span id="foodText">
+</span>
+</label>
+<progress id="food" max="100" value="85">
+</progress>
 </div>
-
-<div id="startScreen">
-  <h1>ECO<span>ZUMBI</span><br><span style="font-size:.5em;color:#9aa7b2;letter-spacing:.3em">SOBREVIVÊNCIA E LOOT</span></h1>
-  <p class="tag">Você começa desarmado. Procure por armas e munições brilhando no chão do acampamento inicial. Clique para pegá-las e use a ferramenta "Atirar" para abater os infectados.</p>
-  <button id="startBtn">INICIAR SIMULAÇÃO</button>
+<div>
+<label for="water">HIDRATAÇÃO <span id="waterText">
+</span>
+</label>
+<progress id="water" max="100" value="90">
+</progress>
 </div>
-
-<script src="js/config.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/world.js"></script>
-<script src="js/physics.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/weapons.js"></script>
-<script src="js/render.js"></script>
-<script src="js/hud.js"></script>
-<script src="js/input.js"></script>
-<script src="js/sim.js"></script>
-<script src="js/main.js"></script>
+<div>
+<label for="energy">ENERGIA <span id="energyText">
+</span>
+</label>
+<progress id="energy" max="100" value="100">
+</progress>
+</div>
+</section>
+<aside class="controls panel">
+<div class="eyebrow">CONTROLE DA SIMULAÇÃO</div>
+<div class="row">
+<button id="pause">Pausar</button>
+<button data-speed="1">1×</button>
+<button data-speed="2">2×</button>
+<button data-speed="5">5×</button>
+</div>
+<div class="row">
+<button id="audio">Som: sim</button>
+<button id="newWorld">Novo mundo</button>
+</div>
+<p id="eco">
+</p>
+<p id="terrain">
+</p>
+<details>
+<summary>Controles e física</summary>
+<p>WASD / setas: mover<br>Shift: correr · R: recarregar<br>1–3: trocar arma · E: comer<br>Esquerdo: usar ferramenta<br>Direito + arrastar: câmera<br>Roda: zoom · F: centralizar<br>Espaço: pausa</p>
+<p>Mire diretamente no membro. Dano acumulado pode separá-lo. Perder a cabeça ou uma perna derruba o infectado. Modo sandbox: todos os recursos iniciais e armas já disponíveis.</p>
+</details>
+</aside>
+<div id="message" role="status" aria-live="polite">
+</div>
+<footer>
+<div class="equipment panel">
+<div>
+<span class="eyebrow">ARMAMENTO</span>
+<div class="row">
+<button data-weapon="pistol">1 Pistola</button>
+<button data-weapon="rifle">2 Rifle</button>
+<button data-weapon="shotgun">3 Escopeta</button>
+<button id="reload">R Recarregar</button>
+<b id="ammo">
+</b>
+</div>
+</div>
+<p id="inventory">
+</p>
+</div>
+<nav class="toolbar panel" aria-label="Ferramentas">
+<button data-tool="shoot">Atirar</button>
+<button data-tool="move">Mover</button>
+<button data-tool="chop">Machado</button>
+<button data-tool="mine">Minerar</button>
+<button data-tool="forage">Colher</button>
+<button data-tool="plant">Plantar</button>
+<button data-tool="water">Água</button>
+<button data-tool="campfire">Fogueira</button>
+<button data-tool="eat">Comer</button>
+<button data-tool="spawn_zombie">+ Zumbi</button>
+<button data-tool="spawn_deer">+ Veado</button>
+<button data-tool="spawn_rabbit">+ Coelho</button>
+</nav>
+</footer>
+<section id="intro">
+<div class="intro-card">
+<span class="eyebrow">UM PEQUENO MUNDO. NENHUM LUGAR SEGURO.</span>
+<h1>ECO<span>ZUMBI</span>
+</h1>
+<p>Uma clareira, um rio e o que restou do mundo.<br>Cultive o solo. Explore a floresta. Sobreviva aos infectados.</p>
+<div class="tags">
+<span>PIXEL ART</span>
+<span>CÂMERA ISOMÉTRICA</span>
+<span>RAGDOLLS</span>
+</div>
+<button id="start">ENTRAR NAS TERRAS PERDIDAS →</button>
+<small>Teclado + mouse · Sem downloads adicionais · Contém violência estilizada</small>
+</div>
+</section>
+<script src="js/config.js">
+</script>
+<script src="js/audio.js">
+</script>
+<script src="js/world.js">
+</script>
+<script src="js/physics.js">
+</script>
+<script src="js/entities.js">
+</script>
+<script src="js/weapons.js">
+</script>
+<script src="js/render.js">
+</script>
+<script src="js/hud.js">
+</script>
+<script src="js/input.js">
+</script>
+<script src="js/sim.js">
+</script>
+<script src="js/main.js">
+</script>
 </body>
 </html>
