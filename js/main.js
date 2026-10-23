@@ -1,26 +1,30 @@
-/* ============================================================
-   Init, reset e loop principal
-   ============================================================ */
-
 function resetWorld(newSeed){
   if(newSeed) worldSeed = Math.floor(Math.random()*1e9);
   simplex = new SimplexNoise(String(worldSeed));
   chunks.clear(); animals=[]; zombies=[]; corpses=[]; particles=[]; campfires=[];
-  bodyParts=[]; projectiles=[];
+  bodyParts=[]; projectiles=[]; lootDrops=[];
   timeOfDay=8.0; dayCount=1; yearDay=30; weather='sunny'; weatherTimer=0; zombieSpawnTimer=0;
+  
   let px=0, py=0;
   for(let i=0;i<60;i++){
     const tx=Math.round((Math.random()-0.5)*40), ty=Math.round((Math.random()-0.5)*40);
     const e=elevation(tx,ty), r=Math.abs(riverField(tx,ty));
     if(r>0.08 && e<0.6 && e>0.25){ px=tx; py=ty; break; }
   }
+  
   player = makeBody(px, py, 0.28, 1.0);
   player.hp=100; player.hunger=20; player.thirst=15; player.stamina=100; player.tx=px; player.ty=py;
   player.shootCd = 0;
+  
+  // --- NOVO: Armas Iniciais ---
+  player.equippedWeapon = 'pistol';
+  player.ammo = 999;
+
   inventory={wood:15,stone:8,food:6,seeds:12};
   spawnInitialFauna(px, py);
   campfires.push({x:px+1, y:py+1});
-  zoom = DEFAULT_ZOOM;   // aplica zoom inicial sempre que criar novo mundo
+  
+  zoom = DEFAULT_ZOOM;
   const iso=gridToIso(px,py);
   camX = canvas.width/2 - iso.x*zoom;
   camY = canvas.height/2 - iso.y*zoom - 60*zoom;
