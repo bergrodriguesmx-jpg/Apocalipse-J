@@ -4,7 +4,12 @@ EZ.makeActor = function(kind, x, y) {
     kind,
     x,
     y,
-    z: 0,
+    z: EZ.groundAt(x, y),
+    thirst: 20,
+    sex: Math.random() < .5 ? 0 : 1,
+    repro: 0,
+    swimming: false,
+    attackTime: 0,
     vx: 0,
     vy: 0,
     radius: kind === 'rabbit' ? .18 : .29,
@@ -36,7 +41,7 @@ EZ.burst = function(p, v, count = 9) {
     EZ.state.particles.push({
       x: p.x,
       y: p.y,
-      z: p.z || .6,
+      z: p.z ?? (EZ.groundAt(p.x, p.y) + .6),
       vx: v.x * .25 + (Math.random() - .5) * 2,
       vy: v.y * .25 + (Math.random() - .5) * 2,
       vz: Math.random() * 2,
@@ -64,7 +69,7 @@ EZ.kill = function(a, impulse = {
     EZ.burst({
       x: a.x,
       y: a.y,
-      z: .25
+      z: a.z + .25
     }, impulse, 6);
   }
   if (a.kind === 'zombie') {
@@ -102,7 +107,7 @@ EZ.hitSpheres = function(a) {
   if (a.kind !== 'zombie' && a.kind !== 'player') return [{
     x: a.x,
     y: a.y,
-    z: a.kind === 'rabbit' ? .2 : .45,
+    z: a.z + (a.kind === 'rabbit' ? .2 : .45),
     r: a.radius,
     group: 'torso',
     node: 'chest'
