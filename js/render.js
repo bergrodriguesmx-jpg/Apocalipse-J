@@ -3,7 +3,7 @@ EZ.project = function(p) {
   const c = EZ.state.camera;
   return {
     x: Math.round((p.x - p.y) * 16 + c.x + c.panX),
-    y: Math.round((p.x + p.y) * 8 - (p.z || 0) * 24 + c.y + c.panY)
+    y: Math.round((p.x + p.y) * 8 - (p.z ?? EZ.surfaceAt(p.x, p.y)) * 24 + c.y + c.panY)
   };
 };
 EZ.unproject = function(x, y, z = 0) {
@@ -58,24 +58,95 @@ EZ.shadow = function(x, y, r = 7) {
   });
   EZ.diamond(p.x, p.y, r, 3, '#263c35');
 };
+// Rasterização de polígonos por scanline: as alturas dos quatro cantos são compartilhadas.
+EZ.polygon = function(points, color) {
+  const min = Math.floor(Math.min(...points.map(p => p.y))),
+    max = Math.ceil(Math.max(...points.map(p => p.y)));
+  EZ.ctx.fillStyle = color;
+  for (let y = Math.max(0, min); y <= Math.min(EZ.canvas.height, max); y++) {
+    const xs = [];
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i],
+        b = points[(i + 1) % points.length];
+      if ((a.y <= y + .5 && b.y > y + .5) || (b.y <= y + .5 && a.y > y + .5)) xs.push(a.x + (y + .5 - a.y) *
+        (b.x - a.x) / (b.y - a.y));
+    }
+    xs.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < xs.length; i += 2) EZ.ctx.fillRect(Math.floor(xs[i]), y, Math.ceil(xs[i + 1]) -
+      Math.floor(xs[i]) + 1, 1);
+  }
+};
+EZ.pickTerrain = function(x, y) {
+  let previous = 6;
+  for (let z = 6; z >= -3; z -= .25) {
+    const g = EZ.unproject(x, y, z);
+    if (z <= EZ.surfaceAt(g.x, g.y)) {
+      let lo = z,
+        hi = previous;
+      for (let j = 0; j < 9; j++) {
+        const mid = (lo + hi) / 2,
+          q = EZ.unproject(x, y, mid);
+        if (mid > EZ.surfaceAt(q.x, q.y)) hi = mid;
+        else lo = mid;
+      }
+      return EZ.unproject(x, y, (lo + hi) / 2);
+    }
+    previous = z;
+  }
+  return EZ.unproject(x, y);
+};
+EZ.tileOnScreen = function(t) {
+  const vertices = [
+    [t.x, t.y],
+    [t.x + 1, t.y],
+    [t.x + 1, t.y + 1],
+    [t.x, t.y + 1]
+  ].map(([x, y], i) => EZ.project({
+    x,
+    y,
+    z: Math.max(0, t.heights[i])
+  }));
+  return Math.max(...vertices.map(p => p.x)) >= 0 && Math.min(...vertices.map(p => p.x)) <= EZ.canvas
+    .width && Math.max(...vertices.map(p => p.y)) >= 0 && Math.min(...vertices.map(p => p.y)) <= EZ.canvas
+    .height;
+};
 EZ.drawTile = function(t) {
+  const h = t.heights,
+    points = [
+      [t.x, t.y],
+      [t.x + 1, t.y],
+      [t.x + 1, t.y + 1],
+      [t.x, t.y + 1]
+    ].map(([x, y], i) => EZ.project({
+      x,
+      y,
+      z: Math.max(0, h[i])
+    }));
+  const season = Math.floor((EZ.state.day - 1) / 4) % 4,
+    slope = h[2] - h[0],
+    colors = season === 3 ? ['#9eafa8', '#acbab0', '#95a59e'] : season === 2 ? ['#777449', '#848052',
+      '#6a6d45'
+    ] : ['#60764c', '#6b7e50', '#596c47'];
+  const color = t.water ? (t.depth > 2 ? '#234453' : t.depth > 1 ? '#305a66' : '#467c7d') : t.field ?
+    '#786046' : t.bed < .35 ? '#99946d' : colors[slope > .18 ? 2 : slope < -.18 ? 1 : Math.floor(t.variant *
+      3)];
+  EZ.polygon(points, color);
   const p = EZ.project({
     x: t.x + .5,
     y: t.y + .5
   });
-  if (p.x < -20 || p.y < -20 || p.x > EZ.canvas.width + 20 || p.y > EZ.canvas.height + 20) return;
-  const season = Math.floor((EZ.state.day - 1) / 4) % 4;
-  const colors = season === 3 ? ['#a4b5ad', '#b4c3b7', '#96aaa4'] : season === 2 ? ['#70734b',
-    '#7e7d4e', '#666c46'
-  ] : ['#64774d', '#6d7e51', '#5d7048'];
-  const color = t.water ? (t.variant > .5 ? '#365e69' : '#315560') : t.field ? '#796146' : colors[Math
-    .floor(t.variant * 3)];
-  EZ.diamond(p.x, p.y, 16, 8, color);
-  for (let k = 0; k < 4; k++) {
-    const h = EZ.hash(t.x * 7 + k, t.y * 9 + k, EZ.state.seed),
-      x = p.x - 10 + h * 20,
-      y = p.y + (EZ.hash(t.y, k + t.x, EZ.state.seed) - .5) * 6;
-    EZ.rect(x, y, t.water ? 4 : 2, 1, t.water ? '#54848b' : t.variant > .7 ? '#87915b' : '#526443');
+  for (let k = 0; k < 3; k++) {
+    const u = .18 + EZ.hash(t.x * 7 + k, t.y * 9 + k, EZ.state.seed) * .64,
+      v = .18 + EZ.hash(t.y * 4 + k, t.x * 3, 31) * .64,
+      q = EZ.project({
+        x: t.x + u,
+        y: t.y + v
+      });
+    EZ.rect(q.x, q.y, t.water ? 4 : 2, 1, t.water ? (t.depth > 1 ? '#3c6c78' : '#78a3a0') : t.grass < 25 ?
+      '#95835c' : '#83915b');
+  }
+  if (t.water && t.depth < .5) {
+    EZ.line(points[0], points[1], '#7b9e99', 1);
   }
   if (t.crop) {
     const n = Math.min(4, 1 + Math.floor(t.crop.progress / 25));
@@ -91,7 +162,7 @@ EZ.drawObject = function(o) {
     y = p.y;
   EZ.shadow(o.x, o.y, o.kind === 'barn' ? 27 : 10);
   if (o.kind === 'tree') {
-    // Dithering ao ocultar o jogador, sem apagar a colisão.
+    // Transparência ao ocultar o jogador, sem apagar a colisão.
     const pp = EZ.project(EZ.state.player),
       fade = Math.abs(pp.x - x) < 20 && pp.y < y && pp.y > y - o.h * 24;
     EZ.ctx.globalAlpha = fade ? .35 : 1;
@@ -130,12 +201,12 @@ EZ.drawObject = function(o) {
     const a = EZ.project({
         x: o.x - o.hw,
         y: o.y,
-        z: .7
+        z: (o.z || 0) + .7
       }),
       b = EZ.project({
         x: o.x + o.hw,
         y: o.y,
-        z: .7
+        z: (o.z || 0) + .7
       });
     EZ.line(a, b, '#b49b6b', 2);
     EZ.line({
@@ -187,6 +258,7 @@ EZ.drawSkeleton = function(nodes, links, color, skin, missing = new Set(), rag =
 };
 EZ.drawActor = function(a) {
   EZ.shadow(a.x, a.y, a.kind === 'rabbit' ? 4 : 7);
+  if (a.kind === 'player' && EZ.drawSurvivor(a)) return;
   if (a.kind === 'player' || a.kind === 'zombie') {
     const pose = EZ.pose(a),
       links = EZ.boneDefs.map(([aa, b, group, width]) => ({
@@ -201,7 +273,7 @@ EZ.drawActor = function(a) {
       const at = EZ.project({
           x: a.x,
           y: a.y,
-          z: 1.23
+          z: a.z + 1.23
         }),
         m = EZ.state.input.mouse,
         angle = Math.atan2(m.y - at.y, m.x - at.x),
@@ -216,7 +288,7 @@ EZ.drawActor = function(a) {
     const p = EZ.project({
         x: a.x,
         y: a.y,
-        z: .25
+        z: a.z + .25
       }),
       small = a.kind === 'rabbit',
       col = {
@@ -247,21 +319,29 @@ EZ.render = function() {
     c = EZ.ctx;
   c.fillStyle = '#253b3a';
   c.fillRect(0, 0, EZ.canvas.width, EZ.canvas.height);
-  for (const t of s.world.tiles) EZ.drawTile(t);
-  for (const stain of s.stains) {
-    const p = EZ.project(stain);
-    EZ.diamond(p.x, p.y, stain.r, 2, '#774c40');
-  }
+  s.world.stats.drawnTiles = 0;
   const draw = [];
   const push = (p, fn) => {
     const q = EZ.project(p);
     if (q.x > -90 && q.x < EZ.canvas.width + 90 && q.y > -20 && q.y < EZ.canvas.height + 120) draw
       .push({
-        depth: p.x + p.y,
+        depth: p.x + p.y + .05,
         fn
       });
   };
-  for (const o of s.world.objects) push(o, () => EZ.drawObject(o));
+  for (const t of s.world.view)
+    if (EZ.tileOnScreen(t)) {
+      draw.push({
+        depth: t.x + t.y,
+        fn: () => EZ.drawTile(t)
+      });
+      s.world.stats.drawnTiles++;
+    }
+  for (const o of s.world.viewObjects) push(o, () => EZ.drawObject(o));
+  for (const stain of s.stains) push(stain, () => {
+    const q = EZ.project(stain);
+    EZ.diamond(q.x, q.y, stain.r, 2, '#774c40');
+  });
   for (const f of s.fires) push(f, () => {
     const p = EZ.project(f);
     EZ.rect(p.x - 6, p.y - 2, 12, 3, '#5b5544');
