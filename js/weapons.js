@@ -2,7 +2,7 @@
 EZ.reload = function() {
   const p = EZ.state.player,
     w = EZ.weapons[p.weapon];
-  if (p.reload > 0 || p.ammo[p.weapon] >= w.mag || p.reserve <= 0) return;
+  if (!w || p.swimming || p.reload > 0 || p.ammo[p.weapon] >= w.mag || p.reserve <= 0) return;
   p.reload = w.reload;
   EZ.message('Recarregando…');
 };
@@ -24,15 +24,15 @@ EZ.aimPoint = function() {
     }
   }
   return closest || {
-    ...EZ.unproject(m.x, m.y, 1.2),
-    z: 1.2
+    ...EZ.unproject(m.x, m.y, s.player.z + 1.2),
+    z: s.player.z + 1.2
   };
 };
 EZ.fire = function() {
   const s = EZ.state,
     p = s.player,
     w = EZ.weapons[p.weapon];
-  if (p.cooldown > 0 || p.reload > 0 || p.dead) return;
+  if (!w || p.swimming || p.cooldown > 0 || p.reload > 0 || p.dead) return;
   if (p.ammo[p.weapon] <= 0) {
     EZ.reload();
     return;
@@ -43,7 +43,7 @@ EZ.fire = function() {
     start = {
       x: p.x,
       y: p.y,
-      z: 1.2
+      z: p.z + 1.2
     },
     dx = aim.x - start.x,
     dy = aim.y - start.y,
@@ -114,9 +114,10 @@ EZ.stepBullets = function(dt) {
         y: old.y + (end.y - old.y) * t,
         z: old.z + (end.z - old.z) * t
       };
-      if (p.z < 0 || s.world.objects.some(o => o.kind !== 'bush' && p.z <= o.h && (o.hw ? Math.abs(p
-            .x - o.x) <= o.hw && Math.abs(p.y - o.y) <= o.hd : Math.hypot(p.x - o.x, p.y - o.y) <= o
-          .r))) {
+      if (p.z < EZ.surfaceAt(p.x, p.y) || EZ.objectsNear(p.x, p.y, 2).some(o => o.kind !== 'bush' && p.z <=
+          (o.z || 0) + o.h && (o.hw ? Math.abs(p
+              .x - o.x) <= o.hw && Math.abs(p.y - o.y) <= o.hd : Math.hypot(p.x - o.x, p.y - o.y) <= o
+            .r))) {
         best = t;
         hit = null;
         blocked = true;
