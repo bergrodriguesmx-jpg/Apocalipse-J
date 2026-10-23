@@ -7,62 +7,49 @@ EZ.reset = function(seed) {
   s.elapsed = 0;
   s.weather = 'Sol';
   s.weatherTimer = 0;
-  s.spawnTimer = 0;
   s.ecosystemTimer = 0;
   s.speed = 1;
-  s.tool = 'shoot';
+  s.tool = 'chop';
   s.kills = 0;
   s.messageTime = 0;
   s.input.down = false;
   s.input.pressed = false;
   s.input.keys.clear();
-  for (const key of ['actors', 'ragdolls', 'bullets', 'particles', 'stains', 'loot', 'fires']) s[
-    key] = [];
+  for (const key of ['actors', 'ragdolls', 'bullets', 'particles', 'stains', 'loot', 'fires']) s[key] = [];
   s.inventory = {
-    wood: 15,
-    stone: 8,
-    food: 6,
-    seeds: 12
+    wood: 0,
+    stone: 0,
+    food: 2,
+    seeds: 3
   };
+  EZ.clearArchive();
   EZ.makeWorld(seed);
-  const p = s.player = EZ.makeActor('player', 32, 32);
+  // A clareira inicial é garantida em terra, independentemente da semente.
+  let x = 32,
+    y = 32;
+  while (EZ.terrainHeight(x, y) < .5) x -= 2;
+  const p = s.player = EZ.makeActor('player', x, y);
   Object.assign(p, {
     hunger: 15,
     thirst: 10,
     stamina: 100,
-    weapon: 'pistol',
+    oxygen: 100,
+    waterBottle: 2,
+    weapon: null,
+    owned: new Set(),
     ammo: {
-      pistol: 12,
-      rifle: 30,
-      shotgun: 6
+      pistol: 0,
+      rifle: 0,
+      shotgun: 0
     },
-    reserve: 120,
+    reserve: 0,
     reload: 0
   });
   s.actors.push(p);
-  for (const [kind, count] of [
-      ['deer', 5],
-      ['rabbit', 8],
-      ['fox', 2],
-      ['wolf', 2],
-      ['zombie', 7]
-    ])
-    for (let i = 0; i < count; i++) {
-      const q = EZ.spawnSpot(32, 32, kind === 'zombie' ? 9 : 5, 18);
-      if (q) s.actors.push(EZ.makeActor(kind, q.x, q.y));
-    }
-  s.loot.push({
-    x: 33,
-    y: 32,
-    kind: 'ammo',
-    amount: 36
-  });
-  s.fires.push({
-    x: 30,
-    y: 33
-  });
   s.camera.panX = s.camera.panY = 0;
   EZ.centerCamera(1);
+  EZ.updateStreaming(true);
+  // Pequeno abrigo inicial visível, sem equipamento criado pelo jogador.
   if (s.mode !== 'start') s.mode = 'playing';
   EZ.accumulator = 0;
 };
@@ -71,39 +58,55 @@ EZ.centerCamera = function(k) {
     p = s.player,
     c = s.camera;
   c.x += (EZ.canvas.width / 2 - (p.x - p.y) * 16 - c.x) * k;
-  c.y += (EZ.canvas.height / 2 + 20 - (p.x + p.y) * 8 - c.y) * k;
+  c.y += (EZ.canvas.height / 2 + 20 - (p.x + p.y) * 8 + p.z * 24 - c.y) * k;
 };
 EZ.resize = function() {
   const c = EZ.canvas,
-    scale = EZ.state.camera.scale;
+    scale = Math.max(EZ.state.camera.scale, Math.ceil(innerWidth / 960), Math.ceil(innerHeight / 600));
   c.width = Math.max(160, Math.floor(innerWidth / scale));
   c.height = Math.max(100, Math.floor(innerHeight / scale));
   c.style.width = c.width * scale + 'px';
   c.style.height = c.height * scale + 'px';
   EZ.ctx.imageSmoothingEnabled = false;
-  if (EZ.state.player) EZ.centerCamera(1);
+  if (EZ.state.player) {
+    EZ.centerCamera(1);
+    EZ.updateStreaming();
+  }
 };
-EZ.init = function() {
+EZ.init = async function() {
   EZ.canvas = document.getElementById('game');
   EZ.ctx = EZ.canvas.getContext('2d', {
     alpha: false
   });
   EZ.resize();
+  const start = document.getElementById('start');
+  start.disabled = true;
+  start.textContent = 'PREPARANDO A REGIÃO…';
+  await EZ.openStorage();
+  await EZ.loadSprites();
   EZ.reset(EZ.state.seed);
   EZ.bindInput();
   window.addEventListener('resize', EZ.resize);
+  start.disabled = false;
+  start.textContent = 'ENTRAR NAS TERRAS PERDIDAS →';
   EZ.accumulator = 0;
   let last = performance.now(),
-    hud = 0;
+    hud = 0,
+    stream = 0;
 
   function frame(now) {
     const real = Math.min((now - last) / 1000, .1);
     last = now;
     const s = EZ.state;
+    stream += real;
+    if (stream > .1 || s.world.queue.length) {
+      EZ.updateStreaming();
+      stream = 0;
+    }
     if (s.mode === 'playing') {
-      EZ.accumulator += real * s.speed;
+      EZ.accumulator += real;
       let count = 0;
-      while (EZ.accumulator >= EZ.C.dt && count < 64) {
+      while (EZ.accumulator >= EZ.C.dt && count < 20) {
         EZ.step(EZ.C.dt);
         EZ.accumulator -= EZ.C.dt;
         count++;
@@ -112,7 +115,7 @@ EZ.init = function() {
           break;
         }
       }
-      if (count === 64) EZ.accumulator = 0;
+      if (count === 20) EZ.accumulator = 0;
       EZ.centerCamera(1 - Math.exp(-7 * real));
     } else {
       EZ.accumulator = 0;
@@ -120,7 +123,7 @@ EZ.init = function() {
     }
     EZ.render();
     hud += real;
-    if (hud > .1) {
+    if (hud > .15) {
       EZ.updateHUD();
       hud = 0;
     }
