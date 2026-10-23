@@ -1,5 +1,5 @@
 /* ============================================================
-   Init, reset e loop principal (ÚLTIMO script carregado)
+   Init, reset e loop principal
    ============================================================ */
 
 function resetWorld(newSeed){
@@ -20,8 +20,11 @@ function resetWorld(newSeed){
   inventory={wood:15,stone:8,food:6,seeds:12};
   spawnInitialFauna(px, py);
   campfires.push({x:px+1, y:py+1});
+  zoom = DEFAULT_ZOOM;   // aplica zoom inicial sempre que criar novo mundo
   const iso=gridToIso(px,py);
-  camX=canvas.width/2-iso.x; camY=canvas.height/2-iso.y-60; camOffsetX=0; camOffsetY=0;
+  camX = canvas.width/2 - iso.x*zoom;
+  camY = canvas.height/2 - iso.y*zoom - 60*zoom;
+  camOffsetX=0; camOffsetY=0;
 }
 
 let rafId=null;
