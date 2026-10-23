@@ -518,4 +518,143 @@ function drawAnimal(a){
   ctx.fillStyle=cfg.color;
   ctx.beginPath(); ctx.ellipse(0,-bodyH*0.5,bodyLen*0.5,bodyH*0.5,0,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=1; ctx.stroke();
-  const hx=bodyLen*0.55, hy=-bodyH*0.7
+  const hx=bodyLen*0.55, hy=-bodyH*0.7;
+  ctx.fillStyle=shade(cfg.color,0.85);
+  ctx.beginPath(); ctx.arc(hx,hy,bodyH*0.35,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  if(a.species==='deer'){
+    ctx.strokeStyle='#d6c9a8'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(hx-1,hy-bodyH*0.3); ctx.lineTo(hx+3,hy-bodyH*0.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx+1,hy-bodyH*0.3); ctx.lineTo(hx-2,hy-bodyH*0.85); ctx.stroke();
+  }
+  if(a.species==='rabbit'){
+    ctx.fillStyle=cfg.color;
+    ctx.fillRect(hx-2,hy-bodyH*0.9,1.8,bodyH*0.7);
+    ctx.fillRect(hx+0.5,hy-bodyH*0.9,1.8,bodyH*0.7);
+  }
+  ctx.fillStyle=a.species==='fox'?'#fff':shade(cfg.color,0.7);
+  ctx.beginPath(); ctx.arc(-bodyLen*0.6,-bodyH*0.5,bodyH*0.25,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCorpse(c){
+  const iso=gridToIso(c.x,c.y);
+  shadowAt(c.x,c.y,8,4);
+  ctx.save();
+  ctx.translate(iso.x, iso.y+hh()-2);
+  ctx.rotate(c.angle);
+  if(c.kind==='zombie'){
+    ctx.fillStyle='#4a6b3a'; ctx.fillRect(-8,-4,16,7);
+    ctx.fillStyle='#9ab88a'; ctx.beginPath(); ctx.arc(9,0,4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#7f1d1d'; ctx.fillRect(-4,-1,6,2);
+  } else {
+    const col = c.species?SPECIES_CFG[c.species].color:'#8b5a2b';
+    ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,0,10,5,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=shade(col,0.85); ctx.beginPath(); ctx.arc(10,0,3.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawBodyPart(p){
+  const iso = gridToIso(p.x, p.y);
+  const lift = p.z * 6;
+  const sx = iso.x, sy = iso.y + TH/2 - lift;
+  const alpha = Math.min(1, p.life / 120);
+
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.5;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath(); ctx.ellipse(iso.x, iso.y + TH/2, 6, 3, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(sx, sy);
+  ctx.rotate(p.angle);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  if(p.type==='head'){
+    ctx.fillStyle = p.skinColor;
+    ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7f1d1d'; ctx.fillRect(-2.5,1.5,5,1.5);
+    ctx.fillStyle = '#dc2626'; ctx.fillRect(-2.5,-1.5,1.5,1.5); ctx.fillRect(1,-1.5,1.5,1.5);
+  } else if(p.type==='arm'){
+    ctx.fillStyle = p.skinColor; ctx.fillRect(-2,-7,4,14); ctx.strokeRect(-2,-7,4,14);
+    ctx.fillStyle = p.color; ctx.fillRect(-2.5,-4,5,4); ctx.strokeRect(-2.5,-4,5,4);
+  } else if(p.type==='leg'){
+    ctx.fillStyle = '#1e3a5f'; ctx.fillRect(-2.5,-8,5,16); ctx.strokeRect(-2.5,-8,5,16);
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(-3,6,6,3); ctx.strokeRect(-3,6,6,3);
+  } else {
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.ellipse(0,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,20,20,0.6)';
+    ctx.beginPath(); ctx.arc(1,1,2.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawProjectile(pr){
+  for (let i = 0; i < pr.trail.length; i++) {
+    const pt = pr.trail[i];
+    const iso = gridToIso(pt.x, pt.y);
+    const a = (i / pr.trail.length) * 0.6;
+    ctx.fillStyle = `rgba(255,220,120,${a})`;
+    ctx.beginPath(); ctx.arc(iso.x, iso.y + TH/2 - 15, 1.5, 0, Math.PI*2); ctx.fill();
+  }
+  const iso = gridToIso(pr.x, pr.y);
+  ctx.save();
+  ctx.translate(iso.x, iso.y + TH/2 - 15);
+  ctx.rotate(pr.angle);
+  ctx.fillStyle = '#fde047'; ctx.fillRect(-4,-1,8,2);
+  ctx.fillStyle = '#fef9c3'; ctx.fillRect(2,-0.5,3,1);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,200,80,0.5)';
+  ctx.beginPath(); ctx.arc(iso.x, iso.y + TH/2 - 15, 4, 0, Math.PI*2); ctx.fill();
+}
+function drawParticles(now){
+  const t=now*0.001;
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    if(p.kind==='seed'||p.kind==='blood') continue;
+    if(p.kind==='ember'){
+      const iso=gridToIso(p.wx,p.wy);
+      const sx=iso.x*zoom+camX+camOffsetX+p.vx*(30-p.life)*zoom;
+      const sy=(iso.y+hh())*zoom+camY+camOffsetY+p.vy*(30-p.life)*zoom;
+      p.life--;
+      if(p.life<=0){particles.splice(i,1);continue;}
+      ctx.fillStyle=`rgba(255,140,40,${p.life/30})`; ctx.fillRect(sx,sy,2.5,2.5);
+      continue;
+    }
+    p.sy+=p.v; p.sx+=p.drift; p.life--;
+    if(p.sy>canvas.height+10||p.sx>canvas.width+20||p.sx<-20||p.life<=0){particles.splice(i,1);continue;}
+    if(p.kind==='rain'){ ctx.strokeStyle='rgba(140,180,220,.5)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(p.sx,p.sy); ctx.lineTo(p.sx+p.drift*0.5,p.sy+8); ctx.stroke(); }
+    else if(p.kind==='snow'){ ctx.fillStyle='rgba(240,248,255,.85)'; ctx.beginPath(); ctx.arc(p.sx,p.sy,1.8,0,Math.PI*2); ctx.fill(); }
+    else if(p.kind==='leaf'){ ctx.fillStyle=`hsl(${20+p.hue},70%,45%)`; ctx.fillRect(p.sx,p.sy,3,2); }
+    else if(p.kind==='pollen'){ ctx.fillStyle='rgba(220,220,120,.5)'; ctx.beginPath(); ctx.arc(p.sx+Math.sin(t+i)*4,p.sy,1.2,0,Math.PI*2); ctx.fill(); }
+    else if(p.kind==='dust'){ p.life--; ctx.fillStyle=`rgba(180,150,100,${p.life/20*0.4})`; ctx.beginPath(); ctx.arc(p.sx,p.sy,2,0,Math.PI*2); ctx.fill(); }
+  }
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; if(p.kind!=='blood') continue;
+    const iso=gridToIso(p.x,p.y);
+    const sx=iso.x*zoom+camX+camOffsetX, sy=(iso.y+hh())*zoom+camY+camOffsetY;
+    ctx.fillStyle=`rgba(140,20,20,${clamp(p.life/30,0,1)*0.8})`;
+    ctx.fillRect(sx-1.5,sy-1.5,3,3);
+  }
+}
+function drawAtmosphere(seasonNow){
+  const t = timeOfDay;
+  let alpha = 0, col = '6,10,20';
+  if (t < 5 || t > 21)           alpha = 0.48;
+  else if (t >= 5 && t <= 7.5)   { alpha = 0.32 * (1 - (t - 5) / 2.5); col = '150,70,20'; }
+  else if (t >= 18 && t <= 21)   { alpha = 0.38 * ((t - 18) / 3);       col = '110,30,40'; }
+  if (weather === 'rain' || weather === 'storm') { alpha = Math.max(alpha, 0.22); col = '15,25,40'; }
+  if (weather === 'snow')                         { alpha = Math.max(alpha, 0.14); col = '180,195,210'; }
+  if (alpha > 0) {
+    ctx.fillStyle = `rgba(${col},${alpha})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const grad = ctx.createRadialGradient(
+    canvas.width/2, canvas.height/2, canvas.width * 0.42,
+    canvas.width/2, canvas.height/2, canvas.width * 0.9
+  );
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(5,8,12,.14)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
