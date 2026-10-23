@@ -5,7 +5,7 @@ EZ.C = {
   dt: 1 / 120,
   iterations: 10,
   gravity: 9.81,
-  size: 64,
+  chunkSize: 16,
   maxZombies: 36,
   maxAnimals: 40,
   maxRagdolls: 32,
@@ -66,7 +66,7 @@ EZ.hash = (x, y, seed) => {
 EZ.state = {
   mode: 'start',
   speed: 1,
-  tool: 'shoot',
+  tool: 'chop',
   seed: 123456,
   clock: 8,
   day: 1,
