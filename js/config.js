@@ -1,6 +1,5 @@
 /* ============================================================
    ECOZUMBI — Configuração global, constantes, estado e utilitários
-   Deve ser o PRIMEIRO script carregado.
    ============================================================ */
 
 const TW = 64, TH = 32;
@@ -11,13 +10,11 @@ const MAX_ZOMBIES = 40;
 const MAX_TREES_PER_CHUNK = 26;
 const SEASONS = ['Primavera','Verão','Outono','Inverno'];
 
-// === CÂMERA / CAMPO DE VISÃO ===
-const DEFAULT_ZOOM = 1.6;   // era 1.0 — câmera mais próxima (~35% menos área visível)
-const MIN_ZOOM = 1.0;       // era 0.5 — não deixa afastar demais
-const MAX_ZOOM = 3.0;       // era 2.2 — permite aproximar mais
-const CHUNK_MARGIN = 2;     // margem de chunks além do visível (evita pop-in)
+const DEFAULT_ZOOM = 1.6;
+const MIN_ZOOM = 1.0;
+const MAX_ZOOM = 3.0;
+const CHUNK_MARGIN = 2;
 
-// Física
 const FRICTION = 6.0;
 const PLAYER_ACCEL = 14;
 const PLAYER_MAX_V = 3.2;
@@ -25,7 +22,12 @@ const ANIMAL_MAX_V = { deer:2.6, rabbit:3.8, fox:3.2, wolf:3.0 };
 const ZOMBIE_MAX_V = 1.6;
 const ZOMBIE_ACCEL = 5;
 
-// Estado global mutável
+const WEAPON_STATS = {
+  pistol:  { name: 'PISTOLA',  dmg: 50, speed: 26, cd: 0.35, spread: 0.08, pellets: 1, color: '#e5e7eb' },
+  rifle:   { name: 'RIFLE',    dmg: 85, speed: 32, cd: 0.15, spread: 0.03, pellets: 1, color: '#fbbf24' },
+  shotgun: { name: 'ESCOPETA', dmg: 30, speed: 22, cd: 0.90, spread: 0.35, pellets: 7, color: '#f97316' }
+};
+
 let canvas, ctx;
 let gameState = 'start';
 let speed = 1;
@@ -38,6 +40,7 @@ let corpses = [];
 let bodyParts = [];
 let projectiles = [];
 let particles = [];
+let lootDrops = []; // NOVO: Array de loot no chão
 let campfires = [];
 let player = null;
 let inventory = { wood:15, stone:8, food:6, seeds:12 };
@@ -61,7 +64,6 @@ let audioCtx = null;
 let zombieSpawnTimer = 0;
 let hitFlashTimer = 0;
 
-// Utilitários
 function hash2(x, y){ const s = Math.sin(x*127.1 + y*311.7 + worldSeed*0.013)*43758.5453; return s - Math.floor(s); }
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 function lerp(a,b,t){ return a+(b-a)*t; }
@@ -72,10 +74,8 @@ function isoToGrid(ix, iy){
   return { x:(ix/(TW/2)+iy/(TH/2))/2, y:(iy/(TH/2)-ix/(TW/2))/2 };
 }
 
-// === FUNÇÃO: retorna AABB do que a câmera vê em coordenadas de grid ===
 function getVisibleGridBounds(){
   const z = zoom;
-  // 4 cantos da tela em coordenadas de mundo (antes do translate/scale)
   const corners = [
     { x: (-camX - camOffsetX)/z,              y: (-camY - camOffsetY)/z },
     { x: (canvas.width - camX - camOffsetX)/z, y: (-camY - camOffsetY)/z },
