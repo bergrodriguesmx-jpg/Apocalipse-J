@@ -99,7 +99,7 @@ function bindInput(){
       case 'spawn_zombie': zombies.push(makeZombie(gx,gy)); break;
     }
   });
-  canvas.addEventListener('wheel', e=>{ e.preventDefault(); zoom=clamp(zoom*(e.deltaY<0?1.08:0.92),0.5,2.2); }, {passive:false});
+  canvas.addEventListener('wheel', e=>{ e.preventDefault(); zoom=clamp(zoom*(e.deltaY<0?1.08:0.92), MIN_ZOOM, MAX_ZOOM); }, {passive:false});
   document.querySelectorAll('.tool-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
