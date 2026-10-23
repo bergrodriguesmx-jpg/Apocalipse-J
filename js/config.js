@@ -1,95 +1,116 @@
-/* ============================================================
-   ECOZUMBI — Configuração global
-   ============================================================ */
-
-const TW = 64, TH = 32;
-const CS = 16;
-const SIM_DT = 180;
-const MAX_ANIMALS = 70;
-const MAX_ZOMBIES = 40;
-const MAX_TREES_PER_CHUNK = 26;
-const SEASONS = ['Primavera','Verão','Outono','Inverno'];
-
-const DEFAULT_ZOOM = 1.6;
-const MIN_ZOOM = 1.0;
-const MAX_ZOOM = 3.0;
-const CHUNK_MARGIN = 2;
-
-const FRICTION = 6.0;
-const PLAYER_ACCEL = 14;
-const PLAYER_MAX_V = 3.2;
-const ANIMAL_MAX_V = { deer:2.6, rabbit:3.8, fox:3.2, wolf:3.0 };
-const ZOMBIE_MAX_V = 1.6;
-const ZOMBIE_ACCEL = 5;
-
-const WEAPON_STATS = {
-  pistol:  { name: 'PISTOLA',  dmg: 50, speed: 26, cd: 0.35, spread: 0.08, pellets: 1, color: '#e5e7eb' },
-  rifle:   { name: 'RIFLE',    dmg: 85, speed: 32, cd: 0.15, spread: 0.03, pellets: 1, color: '#fbbf24' },
-  shotgun: { name: 'ESCOPETA', dmg: 30, speed: 22, cd: 0.90, spread: 0.35, pellets: 7, color: '#f97316' }
+'use strict';
+// Todas as posições físicas estão em metros; a projeção só existe no render.
+const EZ = window.EZ = {};
+EZ.C = {
+  dt: 1 / 120,
+  iterations: 10,
+  gravity: 9.81,
+  size: 64,
+  maxZombies: 36,
+  maxAnimals: 40,
+  maxRagdolls: 32,
+  maxParticles: 350,
+  corpseLife: 90,
+  tileW: 32,
+  tileH: 16
 };
-
-let canvas, ctx;
-let gameState = 'start';
-let speed = 1;
-let worldSeed = Math.floor(Math.random()*1e9);
-let simplex = null;
-const chunks = new Map();
-let animals = [];
-let zombies = [];
-let corpses = [];
-let bodyParts = [];
-let projectiles = [];
-let particles = [];
-let lootDrops = [];
-let campfires = [];
-let player = null;
-let inventory = { wood:15, stone:8, food:6, seeds:12 };
-let activeTool = 'inspect';
-let camX = 0, camY = 0, zoom = DEFAULT_ZOOM;
-let camOffsetX = 0, camOffsetY = 0;
-let isDragging = false, dragStart = {x:0,y:0}, dragMoved = false;
-let hoveredTile = null;
-let keys = {};
-let timeOfDay = 8.0;
-let dayCount = 1;
-let yearDay = 30;
-let weather = 'sunny';
-let weatherTimer = 0;
-let temperature = 18;
-let wind = { angle: Math.PI*0.25, speed: 0.3, targetAngle: Math.PI*0.25, targetSpeed: 0.3 };
-let simAccum = 0, lastFrame = performance.now();
-let ecoStats = { biomass:0, moisture:0, herbivores:0, predators:0, zombies:0 };
-let muted = false;
-let audioCtx = null;
-let zombieSpawnTimer = 0;
-let hitFlashTimer = 0;
-
-// Utilitários
-function hash2(x, y){ const s = Math.sin(x*127.1 + y*311.7 + worldSeed*0.013)*43758.5453; return s - Math.floor(s); }
-function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
-function lerp(a,b,t){ return a+(b-a)*t; }
-function dist2(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; }
-
-function gridToIso(wx, wy){ return { x:(wx-wy)*(TW/2), y:(wx+wy)*(TH/2) }; }
-function isoToGrid(ix, iy){
-  return { x:(ix/(TW/2)+iy/(TH/2))/2, y:(iy/(TH/2)-ix/(TW/2))/2 };
-}
-
-function getVisibleGridBounds(){
-  const z = zoom;
-  const corners = [
-    { x: (-camX - camOffsetX)/z,              y: (-camY - camOffsetY)/z },
-    { x: (canvas.width - camX - camOffsetX)/z, y: (-camY - camOffsetY)/z },
-    { x: (-camX - camOffsetX)/z,              y: (canvas.height - camY - camOffsetY)/z },
-    { x: (canvas.width - camX - camOffsetX)/z, y: (canvas.height - camY - camOffsetY)/z }
-  ];
-  let minGx = Infinity, minGy = Infinity, maxGx = -Infinity, maxGy = -Infinity;
-  for (const c of corners) {
-    const g = isoToGrid(c.x, c.y);
-    if (g.x < minGx) minGx = g.x;
-    if (g.x > maxGx) maxGx = g.x;
-    if (g.y < minGy) minGy = g.y;
-    if (g.y > maxGy) maxGy = g.y;
+EZ.weapons = {
+  pistol: {
+    name: 'Pistola',
+    damage: 34,
+    impulse: 1.4,
+    rate: .3,
+    speed: 85,
+    pellets: 1,
+    spread: .012,
+    mag: 12,
+    reload: 1.2
+  },
+  rifle: {
+    name: 'Rifle',
+    damage: 55,
+    impulse: 2.2,
+    rate: .12,
+    speed: 125,
+    pellets: 1,
+    spread: .008,
+    mag: 30,
+    reload: 1.8
+  },
+  shotgun: {
+    name: 'Escopeta',
+    damage: 19,
+    impulse: 1.1,
+    rate: .85,
+    speed: 70,
+    pellets: 8,
+    spread: .075,
+    mag: 6,
+    reload: 2.1
   }
-  return { minGx, minGy, maxGx, maxGy };
-}
+};
+EZ.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+EZ.distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+EZ.rng = seed => () => {
+  seed |= 0;
+  seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+EZ.hash = (x, y, seed) => {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed;
+  h = Math.imul(h ^ h >>> 13, 1274126177);
+  return ((h ^ h >>> 16) >>> 0) / 4294967296;
+};
+EZ.state = {
+  mode: 'start',
+  speed: 1,
+  tool: 'shoot',
+  seed: 123456,
+  clock: 8,
+  day: 1,
+  elapsed: 0,
+  weather: 'Sol',
+  weatherTimer: 0,
+  spawnTimer: 0,
+  ecosystemTimer: 0,
+  muted: false,
+  actors: [],
+  ragdolls: [],
+  bullets: [],
+  particles: [],
+  stains: [],
+  loot: [],
+  fires: [],
+  kills: 0,
+  inventory: {
+    wood: 15,
+    stone: 8,
+    food: 6,
+    seeds: 12
+  },
+  camera: {
+    x: 0,
+    y: 0,
+    panX: 0,
+    panY: 0,
+    scale: 3
+  },
+  input: {
+    keys: new Set(),
+    mouse: {
+      x: 0,
+      y: 0
+    },
+    down: false,
+    pressed: false,
+    drag: null
+  },
+  message: '',
+  messageTime: 0
+};
+EZ.message = text => {
+  EZ.state.message = text;
+  EZ.state.messageTime = 3;
+};
