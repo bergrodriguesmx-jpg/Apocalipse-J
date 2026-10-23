@@ -9,7 +9,7 @@ function spawnCorpse(x, y, vx, vy, kind, species){
 
 function spawnDismemberment(x, y, vx, vy, isZombie) {
   const types = ['head', 'arm', 'leg', 'torso_chunk'];
-  const n = 2 + Math.floor(Math.random() * 3);
+  const n = 2 + Math.floor(Math.random() * 3); // 2 a 4 partes
   for (let i = 0; i < n; i++) {
     const t = types[Math.floor(Math.random() * types.length)];
     const a = Math.random() * Math.PI * 2;
@@ -18,10 +18,10 @@ function spawnDismemberment(x, y, vx, vy, isZombie) {
       x, y,
       vx: vx * 0.4 + Math.cos(a) * sp,
       vy: vy * 0.4 + Math.sin(a) * sp,
-      vz: 2 + Math.random() * 5,
-      z: 6 + Math.random() * 4,
+      vz: 2 + Math.random() * 5,    // Impulso vertical
+      z: 6 + Math.random() * 4,     // Altura inicial
       angle: Math.random() * Math.PI * 2,
-      vr: (Math.random() - 0.5) * 14,
+      vr: (Math.random() - 0.5) * 14, // Rotação
       type: t,
       color: isZombie ? '#4a6b3a' : '#8b2c2c',
       skinColor: isZombie ? '#9ab88a' : '#e8c39e',
@@ -29,20 +29,15 @@ function spawnDismemberment(x, y, vx, vy, isZombie) {
       maxLife: 650
     });
   }
+  // Spray de sangue
   for (let i = 0; i < 14; i++) {
     const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
     particles.push({kind:'blood', x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:35+Math.random()*25});
   }
 }
 
-// NOVO: Função para dropar itens
 function spawnLoot(x, y, type, amount = 1) {
-  lootDrops.push({ 
-    x, y, 
-    type, // 'pistol', 'rifle', 'shotgun', 'ammo_pistol', 'ammo_rifle', 'ammo_shotgun'
-    amount,
-    id: Math.random()
-  });
+  lootDrops.push({ x, y, type, amount, id: Math.random() });
 }
 
 const SPECIES_CFG = {
@@ -71,14 +66,4 @@ function spawnInitialFauna(cx, cy){
   for(let i=0;i<3;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*30, cy+(Math.random()-0.5)*30, 'fox'));
   for(let i=0;i<2;i++) animals.push(makeAnimal(cx+(Math.random()-0.5)*35, cy+(Math.random()-0.5)*35, 'wolf'));
   for(let i=0;i<4;i++) zombies.push(makeZombie(cx+(Math.random()-0.5)*40, cy+(Math.random()-0.5)*40));
-
-  // Spawn de armas iniciais perto do centro
-  spawnLoot(cx + 2, cy - 1, 'pistol', 1);
-  spawnLoot(cx + 2.5, cy - 1, 'ammo_pistol', 24);
-  
-  spawnLoot(cx - 3, cy + 3, 'shotgun', 1);
-  spawnLoot(cx - 3.5, cy + 3, 'ammo_shotgun', 8);
-
-  spawnLoot(cx + 5, cy + 4, 'rifle', 1);
-  spawnLoot(cx + 5.5, cy + 4, 'ammo_rifle', 10);
 }
