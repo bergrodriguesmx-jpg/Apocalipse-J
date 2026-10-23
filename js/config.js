@@ -3,16 +3,21 @@
    Deve ser o PRIMEIRO script carregado.
    ============================================================ */
 
-// Constantes
 const TW = 64, TH = 32;
 const CS = 16;
-const LOAD_RADIUS = 6;
 const SIM_DT = 180;
 const MAX_ANIMALS = 70;
 const MAX_ZOMBIES = 40;
 const MAX_TREES_PER_CHUNK = 26;
 const SEASONS = ['Primavera','Verão','Outono','Inverno'];
 
+// === CÂMERA / CAMPO DE VISÃO ===
+const DEFAULT_ZOOM = 1.6;   // era 1.0 — câmera mais próxima (~35% menos área visível)
+const MIN_ZOOM = 1.0;       // era 0.5 — não deixa afastar demais
+const MAX_ZOOM = 3.0;       // era 2.2 — permite aproximar mais
+const CHUNK_MARGIN = 2;     // margem de chunks além do visível (evita pop-in)
+
+// Física
 const FRICTION = 6.0;
 const PLAYER_ACCEL = 14;
 const PLAYER_MAX_V = 3.2;
@@ -37,7 +42,7 @@ let campfires = [];
 let player = null;
 let inventory = { wood:15, stone:8, food:6, seeds:12 };
 let activeTool = 'inspect';
-let camX = 0, camY = 0, zoom = 1.0;
+let camX = 0, camY = 0, zoom = DEFAULT_ZOOM;
 let camOffsetX = 0, camOffsetY = 0;
 let isDragging = false, dragStart = {x:0,y:0}, dragMoved = false;
 let hoveredTile = null;
@@ -56,14 +61,34 @@ let audioCtx = null;
 let zombieSpawnTimer = 0;
 let hitFlashTimer = 0;
 
-// Utilitários matemáticos
+// Utilitários
 function hash2(x, y){ const s = Math.sin(x*127.1 + y*311.7 + worldSeed*0.013)*43758.5453; return s - Math.floor(s); }
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 function lerp(a,b,t){ return a+(b-a)*t; }
 function dist2(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; }
 
-// Conversão isométrica
 function gridToIso(wx, wy){ return { x:(wx-wy)*(TW/2), y:(wx+wy)*(TH/2) }; }
 function isoToGrid(ix, iy){
   return { x:(ix/(TW/2)+iy/(TH/2))/2, y:(iy/(TH/2)-ix/(TW/2))/2 };
+}
+
+// === FUNÇÃO: retorna AABB do que a câmera vê em coordenadas de grid ===
+function getVisibleGridBounds(){
+  const z = zoom;
+  // 4 cantos da tela em coordenadas de mundo (antes do translate/scale)
+  const corners = [
+    { x: (-camX - camOffsetX)/z,              y: (-camY - camOffsetY)/z },
+    { x: (canvas.width - camX - camOffsetX)/z, y: (-camY - camOffsetY)/z },
+    { x: (-camX - camOffsetX)/z,              y: (canvas.height - camY - camOffsetY)/z },
+    { x: (canvas.width - camX - camOffsetX)/z, y: (canvas.height - camY - camOffsetY)/z }
+  ];
+  let minGx = Infinity, minGy = Infinity, maxGx = -Infinity, maxGy = -Infinity;
+  for (const c of corners) {
+    const g = isoToGrid(c.x, c.y);
+    if (g.x < minGx) minGx = g.x;
+    if (g.x > maxGx) maxGx = g.x;
+    if (g.y < minGy) minGy = g.y;
+    if (g.y > maxGy) maxGy = g.y;
+  }
+  return { minGx, minGy, maxGx, maxGy };
 }
