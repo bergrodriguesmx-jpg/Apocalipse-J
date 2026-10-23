@@ -1,7 +1,3 @@
-/* ============================================================
-   Loop de simulação ecológica + física (tick)
-   ============================================================ */
-
 function simulate(dt){
   const dtSec = dt*SIM_DT/1000;
 
@@ -81,14 +77,14 @@ function simulate(dt){
     }
   }
 
-  // ---- ANIMAIS ----
+  // ANIMAIS
   let herb=0, pred=0;
   for(let i=animals.length-1;i>=0;i--){
     const a=animals[i]; const cfg=SPECIES_CFG[a.species];
     a.age+=0.02*dt; a.hunger=clamp(a.hunger+0.06*dt,0,100); a.thirst=clamp(a.thirst+0.09*dt,0,100);
     if(a.hunger>95||a.thirst>95||a.age>cfg.maxAge) a.hp=clamp(a.hp-0.3*dt,0,100);
     if(a.hp<=0){
-      spawnDismemberment(a.x, a.y, a.vx*0.5, a.vy*0.5, false);
+      spawnDismemberment(a.x, a.y, a.vx*0.5, a.vy*0.5, false); // DESMEMBRA ANIMAL
       spawnCorpse(a.x,a.y,a.vx,a.vy,'animal',a.species);
       animals.splice(i,1); continue;
     }
@@ -132,7 +128,7 @@ function simulate(dt){
   separateBodies(animals);
   ecoStats.herbivores=herb; ecoStats.predators=pred;
 
-  // ---- ZUMBIS ----
+  // ZUMBIS
   zombieSpawnTimer += dt;
   if(zombies.length<MAX_ZOMBIES && zombieSpawnTimer>40){
     zombieSpawnTimer=0;
@@ -142,7 +138,7 @@ function simulate(dt){
   for(let i=zombies.length-1;i>=0;i--){
     const z=zombies[i];
     if(z.hp<=0){
-      spawnDismemberment(z.x, z.y, z.vx*0.5, z.vy*0.5, true);
+      spawnDismemberment(z.x, z.y, z.vx*0.5, z.vy*0.5, true); // DESMEMBRA ZUMBI
       spawnCorpse(z.x,z.y,z.vx,z.vy,'zombie');
       zombies.splice(i,1); continue;
     }
@@ -187,8 +183,7 @@ function simulate(dt){
     let hit = false;
 
     for (let s = 0; s < sub && !hit; s++) {
-      pr.x += stepX;
-      pr.y += stepY;
+      pr.x += stepX; pr.y += stepY;
 
       for (let j = zombies.length - 1; j >= 0; j--) {
         const z = zombies[j];
@@ -197,20 +192,18 @@ function simulate(dt){
           z.hp -= pr.damage;
           const ka = Math.atan2(pr.vy, pr.vx);
           const kb = 4 / z.mass;
-          z.vx += Math.cos(ka) * kb;
-          z.vy += Math.sin(ka) * kb;
+          z.vx += Math.cos(ka) * kb; z.vy += Math.sin(ka) * kb;
           for (let k = 0; k < 10; k++) {
             const aa = ka + (Math.random() - 0.5) * 1.2;
             const sp2 = 2 + Math.random() * 4;
             particles.push({kind:'blood', x:z.x, y:z.y, vx:Math.cos(aa)*sp2, vy:Math.sin(aa)*sp2, life:30+Math.random()*20});
           }
           if (z.hp <= 0) {
-            spawnDismemberment(z.x, z.y, pr.vx * 0.35, pr.vy * 0.35, true);
+            spawnDismemberment(z.x, z.y, pr.vx * 0.35, pr.vy * 0.35, true); // TIRO DESMEMBRA
             spawnCorpse(z.x, z.y, z.vx, z.vy, 'zombie');
             zombies.splice(j, 1);
           }
-          hit = true;
-          break;
+          hit = true; break;
         }
       }
 
@@ -224,28 +217,26 @@ function simulate(dt){
         }
       }
     }
-
     pr.trail.push({ x: pr.x, y: pr.y });
     if (pr.trail.length > 6) pr.trail.shift();
-
     pr.life -= dtSec;
     if (hit || pr.life <= 0) projectiles.splice(i, 1);
   }
 
-  // MEMBROS DESMEMBRADOS
+  // --- FÍSICA DOS MEMBROS (DESMEMBRAMENTO) ---
   for (let i = bodyParts.length - 1; i >= 0; i--) {
     const p = bodyParts[i];
     p.x += p.vx * dtSec;
     p.y += p.vy * dtSec;
     p.z += p.vz * dtSec;
-    p.vz -= 14 * dtSec;
+    p.vz -= 14 * dtSec; // Gravidade
     if (p.z <= 0) {
       p.z = 0;
-      p.vz *= -0.25;
+      p.vz *= -0.25; // Quique
       p.vx *= 0.55; p.vy *= 0.55;
       p.vr *= 0.55;
     }
-    p.vx *= Math.exp(-1.6 * dtSec);
+    p.vx *= Math.exp(-1.6 * dtSec); // Atrito
     p.vy *= Math.exp(-1.6 * dtSec);
     p.angle += p.vr * dtSec;
     p.vr *= Math.exp(-1.2 * dtSec);
@@ -269,13 +260,5 @@ function simulate(dt){
   if(isRaining||isSnowing){
     const n=isSnowing?2:(weather==='storm'?5:3);
     for(let i=0;i<n;i++) if(particles.length<260) particles.push({kind:isSnowing?'snow':'rain', sx:Math.random()*canvas.width, sy:Math.random()*canvas.height, v:isSnowing?(0.6+Math.random()*0.8):(6+Math.random()*4), drift:Math.cos(wind.angle)*wind.speed*3, life:300});
-  }
-  if(seasonNow===2&&Math.random()<0.3*dt&&particles.length<260) particles.push({kind:'leaf',sx:Math.random()*canvas.width,sy:-10,v:0.5+Math.random(),drift:Math.cos(wind.angle)*wind.speed*2,life:400,hue:Math.random()*40});
-  if(seasonNow===0&&Math.random()<0.15*dt&&particles.length<260) particles.push({kind:'pollen',sx:Math.random()*canvas.width,sy:Math.random()*canvas.height,v:0.2,drift:Math.cos(wind.angle)*wind.speed*1.5,life:200});
-  for(const f of campfires) if(Math.random()<0.4*dt&&particles.length<260){ const iso=gridToIso(f.x+0.5,f.y+0.5); particles.push({kind:'ember',wx:f.x+0.5,wy:f.y+0.5,vx:(Math.random()-0.5)*0.5,vy:-1-Math.random(),life:30+Math.random()*20}); }
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i]; if(p.kind!=='blood') continue;
-    p.x+=p.vx*dtSec*2; p.y+=p.vy*dtSec*2; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
-    if(p.life<=0){ const t=tileAt(Math.floor(p.x),Math.floor(p.y)); if(t) t.humus+=0.5; particles.splice(i,1); }
   }
 }
