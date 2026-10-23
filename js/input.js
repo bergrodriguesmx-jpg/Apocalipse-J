@@ -1,241 +1,129 @@
-'use strict';
-EZ.selectWeapon = function(name) {
-  const p = EZ.state.player;
-  if (!p.owned.has(name)) {
-    EZ.message('Procure essa arma nas ruínas.');
-    return;
+function mouseToGrid(e){
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  return isoToGrid((mx-camX-camOffsetX)/zoom, (my-camY-camOffsetY)/zoom);
+}
+
+function findEntityAt(gx, gy){
+  for(const c of chunks.values()){
+    for(const tr of c.trees) if(Math.floor(tr.x)===gx&&Math.floor(tr.y)===gy) return {type:'tree',obj:tr,chunk:c};
+    for(const r of c.rocks) if(Math.floor(r.x)===gx&&Math.floor(r.y)===gy) return {type:'rock',obj:r,chunk:c};
+    for(const b of c.bushes) if(!b.hay&&Math.floor(b.x)===gx&&Math.floor(b.y)===gy) return {type:'bush',obj:b,chunk:c};
   }
-  if (p.reload > 0) {
-    EZ.message('Espere terminar a recarga.');
-    return;
-  }
-  p.weapon = name;
-  EZ.state.tool = 'shoot';
-};
-EZ.useTool = function() {
-  const s = EZ.state,
-    p = s.player,
-    m = s.input.mouse,
-    g = EZ.pickTerrain(m.x, m.y),
-    t = EZ.tile(g.x, g.y),
-    inv = s.inventory;
-  if (s.tool === 'eat') {
-    if (inv.food > 0) {
-      inv.food--;
-      p.hunger = Math.max(0, p.hunger - 35);
-      EZ.message('Você comeu.');
-    } else EZ.message('Sem comida.');
-    return;
-  }
-  if (s.tool === 'move') {
-    p.target = g;
-    return;
-  }
-  if (p.swimming) {
-    EZ.message('Saia da água funda para usar ferramentas.');
-    return;
-  }
-  if (!t || EZ.distance(p, g) > 2.8) {
-    EZ.message('Aproxime-se: alcance máximo de 2,8 metros.');
-    return;
-  }
-  const object = EZ.objectsNear(g.x, g.y, 2).filter(o => EZ.distance(o, g) < 1).sort((a, b) => EZ.distance(
-      a, g) -
-    EZ.distance(b, g))[0];
-  if ((s.tool === 'chop' || s.tool === 'mine') && p.cooldown > 0) return;
-  if (s.tool === 'chop' || s.tool === 'mine') {
-    p.attackTime = .35;
-  }
-  if (s.tool === 'chop') {
-    const z = s.actors.find(a => a.kind === 'zombie' && EZ.distance(a, g) < .9 && !a.dead);
-    if (z) {
-      if (p.cooldown > 0) return;
-      p.cooldown = .5;
-      EZ.damage(z, 'torso', 45, {
-        x: (z.x - p.x) * 2,
-        y: (z.y - p.y) * 2,
-        z: .2
-      }, 'chest');
+  return null;
+}
+function findZombieNear(gx, gy, range){
+  for(const z of zombies) if(dist2(z.x,z.y,gx+0.5,gy+0.5) < range*range) return z;
+  return null;
+}
+
+function bindInput(){
+  window.addEventListener('keydown', e=>{ 
+    keys[e.code]=true; 
+    // --- NOVO: Troca de Armas ---
+    if(e.code === 'Digit1') player.equippedWeapon = 'pistol';
+    if(e.code === 'Digit2') player.equippedWeapon = 'rifle';
+    if(e.code === 'Digit3') player.equippedWeapon = 'shotgun';
+  });
+  window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+  
+  canvas.addEventListener('mousedown', e=>{
+    if(!audioCtx) try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){}
+    if(e.button===0){ isDragging=true; dragMoved=false; dragStart={x:e.clientX,y:e.clientY,ox:camOffsetX,oy:camOffsetY}; }
+  });
+  
+  window.addEventListener('mousemove', e=>{
+    if(isDragging){
+      const dx=e.clientX-dragStart.x, dy=e.clientY-dragStart.y;
+      if(Math.abs(dx)+Math.abs(dy)>4) dragMoved=true;
+      camOffsetX=dragStart.ox+dx; camOffsetY=dragStart.oy+dy;
+    }
+    const g=mouseToGrid(e);
+    const t=tileAt(Math.floor(g.x),Math.floor(g.y));
+    if(t){ hoveredTile=t; updateTooltip(e.clientX,e.clientY); }
+    else { hoveredTile=null; hideTooltip(); }
+  });
+  
+  window.addEventListener('mouseup', ()=>{ isDragging=false; });
+
+  canvas.addEventListener('click', e=>{
+    if(dragMoved) return;
+    
+    // Pega a posição EXATA do mouse no mundo (não apenas o grid)
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const worldX = (mx - camX - camOffsetX) / zoom;
+    const worldY = (my - camY - camOffsetY) / zoom;
+    
+    const g = isoToGrid(worldX, worldY);
+    const gx = Math.floor(g.x), gy = Math.floor(g.y);
+    const tile = tileAt(gx,gy);
+
+    // Atirar
+    if (player.equippedWeapon && (activeTool === 'inspect' || activeTool === 'interact')) {
+      fireWeapon(worldX, worldY); // Passa a posição exata em pixels
       return;
     }
-    if (object?.kind === 'tree') {
-      p.cooldown = .5;
-      object.hp--;
-      EZ.sound(120);
-      if (object.hp <= 0) {
-        inv.wood += 5;
-        EZ.removeObject(object);
-      }
-    }
-  } else if (s.tool === 'mine' && object?.kind === 'rock') {
-    p.cooldown = .5;
-    object.hp--;
-    EZ.sound(400);
-    if (object.hp <= 0) {
-      inv.stone += 4;
-      EZ.removeObject(object);
-    }
-  } else if (s.tool === 'forage') {
-    if (object?.kind === 'bush' && object.berries) {
-      object.berries = false;
-      inv.food += 2;
-    } else if (t.crop?.progress >= 100) {
-      inv.food += 3;
-      inv.seeds += 2;
-      t.crop = null;
-    } else EZ.message('Nada pronto para colher.');
-  } else if (s.tool === 'plant') {
-    if (!t.water && !t.crop && inv.seeds > 0 && EZ.freeSpot(t.x + .5, t.y + .5)) {
-      t.crop = {
-        progress: 0
-      };
-      t.field = true;
-      inv.seeds--;
-    } else EZ.message('Escolha um terreno livre e tenha sementes.');
-  } else if (s.tool === 'water') {
-    if (t.water) {
-      p.thirst = 0;
-      p.waterBottle = 3;
-      EZ.message('Você bebeu e encheu o cantil.');
-    } else {
-      if (p.waterBottle <= 0) {
-        EZ.message('Encha o cantil no rio.');
-        return;
-      }
-      p.waterBottle--;
-      t.moist = Math.min(100, t.moist + 35);
-      EZ.message('Solo irrigado.');
-    }
-  } else if (s.tool === 'campfire') {
-    if (inv.wood >= 5 && inv.stone >= 3 && EZ.freeSpot(g.x, g.y) && !s.fires.some(f => EZ.distance(f,
-        g) < 1)) {
-      inv.wood -= 5;
-      inv.stone -= 3;
-      s.fires.push({
-        x: g.x,
-        y: g.y
-      });
-    } else EZ.message('Precisa de espaço, 5 madeiras e 3 pedras.');
-  }
-};
-EZ.pause = function() {
-  const s = EZ.state;
-  if (s.mode === 'playing') s.mode = 'paused';
-  else if (s.mode === 'paused') s.mode = 'playing';
-  s.input.down = false;
-  s.input.pressed = false;
-};
-EZ.bindInput = function() {
-  const s = EZ.state,
-    canvas = EZ.canvas;
 
-  function clear() {
-    s.input.keys.clear();
-    s.input.down = false;
-    s.input.pressed = false;
-    s.input.drag = null;
-  }
+    // Ações das Ferramentas
+    if(!tile && activeTool !== 'inspect') return; 
+    const ent=findEntityAt(gx,gy);
 
-  function point(e) {
-    const r = canvas.getBoundingClientRect();
-    s.input.mouse = {
-      x: (e.clientX - r.left) * canvas.width / r.width,
-      y: (e.clientY - r.top) * canvas.height / r.height
-    };
-  }
-  window.addEventListener('keydown', e => {
-    if (e.target.closest('input,textarea,select')) return;
-    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
-    s.input.keys.add(e.code);
-    if (e.repeat) return;
-    if (e.code === 'Escape' || e.code === 'Space') EZ.pause();
-    if (s.mode !== 'playing') return;
-    const w = {
-      Digit1: 'pistol',
-      Digit2: 'rifle',
-      Digit3: 'shotgun'
-    } [e.code];
-    if (w) EZ.selectWeapon(w);
-    if (e.code === 'KeyR') EZ.reload();
-    if (e.code === 'KeyF') {
-      s.camera.panX = s.camera.panY = 0;
-    }
-    if (e.code === 'KeyE') {
-      const previous = s.tool;
-      s.tool = 'eat';
-      EZ.useTool();
-      s.tool = previous;
-    }
-  });
-  window.addEventListener('keyup', e => s.input.keys.delete(e.code));
-  window.addEventListener('blur', () => {
-    clear();
-    if (s.mode === 'playing') s.mode = 'paused';
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      clear();
-      if (s.mode === 'playing') s.mode = 'paused';
+    switch(activeTool){
+      case 'inspect':
+      case 'interact': 
+        if(player){ player.tx=gx+0.5; player.ty=gy+0.5; } 
+        break;
+      case 'chop': {
+        const z=findZombieNear(gx,gy,1.5);
+        if(z){
+          z.hp=Math.max(0,z.hp-55);
+          const ka=Math.atan2(z.y-player.y, z.x-player.x);
+          z.vx+=Math.cos(ka)*5; z.vy+=Math.sin(ka)*5;
+          for(let k=0;k<8;k++){ const aa=Math.random()*Math.PI*2, sp=1+Math.random()*3; particles.push({kind:'blood',x:z.x,y:z.y,vx:Math.cos(aa)*sp,vy:Math.sin(aa)*sp,life:25+Math.random()*20}); }
+          snd(120,'sawtooth',.12,.25);
+        } else if(ent&&ent.type==='tree'){
+          inventory.wood+=ent.obj.species==='pine'?6:4; if(tile) tile.humus+=8;
+          ent.chunk.trees=ent.chunk.trees.filter(x=>x!==ent.obj);
+          snd(120,'sawtooth',.12,.25);
+        }
+        break; }
+      case 'mine':
+        if(ent&&ent.type==='rock'){ inventory.stone+=4; ent.chunk.rocks=ent.chunk.rocks.filter(x=>x!==ent.obj); snd(520,'square',.06,.15); }
+        break;
+      case 'forage':
+        if(ent&&ent.type==='bush'&&ent.obj.berries){ inventory.food+=2; ent.obj.berries=false; snd(300,'sine',.1,.1); }
+        break;
+      case 'campfire':
+        if(inventory.wood>=5&&inventory.stone>=3){ inventory.wood-=5; inventory.stone-=3; campfires.push({x:gx,y:gy}); snd(200,'triangle',.2,.2); }
+        break;
+      case 'eat':
+        if(inventory.food>0){ inventory.food--; player.hunger=Math.max(0,player.hunger-30); snd(280,'sine',.08,.12); }
+        break;
+      case 'spawn_zombie': zombies.push(makeZombie(gx,gy)); break;
     }
   });
-  canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('pointerdown', e => {
-    if (s.mode !== 'playing') return;
-    point(e);
-    EZ.unlockAudio();
-    canvas.setPointerCapture(e.pointerId);
-    if (e.button === 2 || e.button === 1) s.input.drag = {
-      x: e.clientX,
-      y: e.clientY,
-      px: s.camera.panX,
-      py: s.camera.panY
-    };
-    else if (e.button === 0) {
-      s.input.down = true;
-      s.input.pressed = true;
-    }
+  
+  canvas.addEventListener('wheel', e=>{ e.preventDefault(); zoom=clamp(zoom*(e.deltaY<0?1.08:0.92), MIN_ZOOM, MAX_ZOOM); }, {passive:false});
+  
+  document.querySelectorAll('.tool-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); activeTool=btn.dataset.tool;
+    });
   });
-  canvas.addEventListener('pointermove', e => {
-    point(e);
-    const d = s.input.drag;
-    if (d) {
-      const r = canvas.getBoundingClientRect();
-      s.camera.panX = d.px + (e.clientX - d.x) * canvas.width / r.width;
-      s.camera.panY = d.py + (e.clientY - d.y) * canvas.height / r.height;
-    }
+  
+  document.getElementById('btnPause').addEventListener('click', ()=>{
+    gameState=gameState==='playing'?'paused':'playing';
+    document.getElementById('btnPause').classList.toggle('active',gameState==='paused');
   });
-  canvas.addEventListener('pointerup', () => {
-    s.input.down = false;
-    s.input.drag = null;
+  
+  document.getElementById('btnRegen').addEventListener('click', ()=>resetWorld(true));
+  
+  document.getElementById('btnAudio').addEventListener('click', ()=>{
+    muted=!muted;
+    document.getElementById('btnAudio').classList.toggle('text-red-400',muted);
+    document.getElementById('btnAudio').innerHTML=muted?'<i class="fa-solid fa-volume-xmark"></i>':'<i class="fa-solid fa-volume-high"></i>';
   });
-  canvas.addEventListener('pointercancel', clear);
-  canvas.addEventListener('lostpointercapture', () => {
-    s.input.down = false;
-    s.input.drag = null;
-  });
-  canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    s.camera.scale = EZ.clamp(s.camera.scale + (e.deltaY < 0 ? 1 : -1), 2, 5);
-    EZ.resize();
-  }, {
-    passive: false
-  });
-  document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
-    s.tool = b.dataset.tool;
-  });
-  document.querySelectorAll('[data-weapon]').forEach(b => b.onclick = () => EZ.selectWeapon(b.dataset
-    .weapon));
-
-  document.getElementById('pause').onclick = EZ.pause;
-  document.getElementById('newWorld').onclick = () => EZ.reset((Math.random() * 1e9) | 0);
-  document.getElementById('audio').onclick = () => {
-    EZ.unlockAudio();
-    s.muted = !s.muted;
-  };
-  document.getElementById('reload').onclick = EZ.reload;
-  document.getElementById('start').onclick = () => {
-    EZ.unlockAudio();
-    s.mode = 'playing';
-    document.getElementById('intro').hidden = true;
-  };
-};
+}
