@@ -1,50 +1,70 @@
-'use strict';
-EZ.updateHUD = function() {
-  const s = EZ.state,
-    p = s.player;
-  for (const [id, value] of Object.entries({
-      hp: p.hp,
-      food: 100 - p.hunger,
-      water: 100 - p.thirst,
-      energy: p.stamina
-    })) {
-    document.getElementById(id).value = value;
-    document.getElementById(id + 'Text').textContent = Math.max(0, Math.ceil(value)) + '%';
+function updateHUD(seasonNow){
+  if(gameState!=='playing'&&gameState!=='paused') return;
+  if(player){
+    document.getElementById('hpVal').textContent=Math.round(player.hp)+'%';
+    document.getElementById('hpBar').style.width=player.hp+'%';
+    document.getElementById('hungerVal').textContent=Math.round(100-player.hunger)+'%';
+    document.getElementById('hungerBar').style.width=(100-player.hunger)+'%';
+    document.getElementById('thirstVal').textContent=Math.round(100-player.thirst)+'%';
+    document.getElementById('thirstBar').style.width=(100-player.thirst)+'%';
+    document.getElementById('staminaVal').textContent=Math.round(player.stamina)+'%';
+    document.getElementById('staminaBar').style.width=player.stamina+'%';
+    
+    const wName = document.getElementById('weaponName');
+    const wAmmo = document.getElementById('ammoCount');
+    
+    if (player.equippedWeapon) {
+      wName.textContent = `[1] PISTOLA | [2] RIFLE | [3] ESCOPETA`;
+      wName.style.fontSize = '10px';
+      wName.style.color = WEAPON_STATS[player.equippedWeapon].color;
+      
+      // Destaca a arma atual
+      wName.innerHTML = `
+        <span style="opacity:${player.equippedWeapon==='pistol'?1:0.4}">[1] Pistola</span> | 
+        <span style="opacity:${player.equippedWeapon==='rifle'?1:0.4}">[2] Rifle</span> | 
+        <span style="opacity:${player.equippedWeapon==='shotgun'?1:0.4}">[3] Escopeta</span>
+      `;
+      
+      wAmmo.textContent = player.ammo;
+      wAmmo.style.color = player.ammo > 0 ? '#e5e7eb' : '#ef4444';
+    }
   }
-  document.getElementById('ammo').textContent = !p.weapon ? 'PROCURE ARMAS' : p.reload > 0 ?
-    'RECARREGANDO' : p.ammo[p.weapon] + ' / ' + p.reserve;
-  document.getElementById('clock').textContent = String(Math.floor(s.clock)).padStart(2, '0') + ':' +
-    String(Math.floor(s.clock % 1 * 60)).padStart(2, '0');
-  document.getElementById('day').textContent = 'DIA ' + s.day + ' · ' + ['PRIMAVERA', 'VERÃO', 'OUTONO',
-    'INVERNO'
-  ][Math.floor((s.day - 1) / 4) % 4];
-  document.getElementById('weather').textContent = s.weather.toUpperCase();
-  document.getElementById('inventory').textContent =
-    `MADEIRA ${s.inventory.wood} · PEDRA ${s.inventory.stone} · COMIDA ${s.inventory.food} · SEMENTES ${s.inventory.seeds} · CANTIL ${p.waterBottle}/3`;
-  const zs = s.actors.filter(a => a.kind === 'zombie' && !a.dead).length,
-    fauna = s.actors.filter(a => !['zombie', 'player'].includes(a.kind) && !a.dead).length;
-  document.getElementById('eco').textContent = `REGIÃO ATIVA: ${zs} infectados · ${fauna} animais`;
-  const g = EZ.pickTerrain(s.input.mouse.x, s.input.mouse.y),
-    tile = EZ.tile(g.x, g.y);
-  document.getElementById('terrain').textContent = tile ?
-    `ALTITUDE ${EZ.groundAt(g.x,g.y).toFixed(1)} m · ${tile.water?'PROFUNDIDADE '+EZ.depthAt(g.x,g.y).toFixed(1)+' m':'UMIDADE '+Math.round(tile.moist)+'%'}` +
-    (tile.crop ? ` · CULTIVO ${Math.floor(tile.crop.progress)}%` : '') : '';
-  document.getElementById('stream').textContent =
-    `${s.world.stats.drawnTiles} células visíveis · ${s.world.chunks.size} chunks em memória`;
-  document.getElementById('swim').textContent = p.swimming ?
-    `NADANDO · FÔLEGO ${Math.ceil(p.oxygen)}% · profundidade ${EZ.depthAt(p.x,p.y).toFixed(1)} m` : p
-    .wading ? 'ATRAVESSANDO ÁGUA RASA' : '';
-  document.getElementById('message').textContent = s.mode === 'dead' ?
-    'VOCÊ MORREU · NOVO MUNDO PARA RECOMEÇAR' : s.mode === 'paused' ? 'PAUSADO · ESPAÇO PARA CONTINUAR' : s
-    .messageTime > 0 ? s.message : EZ.archive.warning ?
-    'Armazenamento indisponível: regiões exploradas serão conservadas na memória.' : '';
-  document.getElementById('pause').textContent = s.mode === 'paused' ? 'Continuar' : 'Pausar';
-  document.getElementById('audio').textContent = s.muted ? 'Som: não' : 'Som: sim';
-  for (const b of document.querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool ===
-    s.tool);
-  for (const b of document.querySelectorAll('[data-weapon]')) {
-    b.classList.toggle('active', b.dataset.weapon === p.weapon);
-    b.disabled = !p.owned.has(b.dataset.weapon);
-    b.title = b.disabled ? 'Encontre esta arma em uma ruína' : '';
+  document.getElementById('invWood').textContent=inventory.wood;
+  document.getElementById('invStone').textContent=inventory.stone;
+  document.getElementById('invFood').textContent=inventory.food;
+  document.getElementById('invSeeds').textContent=inventory.seeds;
+  
+  const hrs=String(Math.floor(timeOfDay)).padStart(2,'0'), mins=String(Math.floor((timeOfDay%1)*60)).padStart(2,'0');
+  document.getElementById('clockText').textContent=hrs+':'+mins;
+  document.getElementById('dayText').textContent='Dia '+dayCount;
+  document.getElementById('seasonText').textContent=SEASONS[seasonNow];
+  
+  document.getElementById('ecoBiomass').textContent=ecoStats.biomass+' t';
+  document.getElementById('ecoMoisture').textContent=ecoStats.moisture+'%';
+  document.getElementById('ecoHerbivores').textContent=ecoStats.herbivores;
+  document.getElementById('ecoZombies').textContent=ecoStats.zombies;
+}
+
+function updateTooltip(mx, my){
+  const tt=document.getElementById('tooltip');
+  if(!hoveredTile){ hideTooltip(); return; }
+  const t=hoveredTile;
+  tt.style.display='block';
+  tt.style.left=Math.min(mx+15,window.innerWidth-260)+'px';
+  tt.style.top=Math.min(my+15,window.innerHeight-180)+'px';
+  const biomeNames={deepwater:'Rio Profundo',shallow:'Margem/Rio Raso',field:'Campo Arado',overgrown:'Campo Vegetado',rocky:'Solo Rochoso',pineforest:'Floresta de Coníferas',broadleaf:'Floresta Latifoliada',meadow:'Prado Úmido',drygrass:'Campo Seco',grass:'Pastagem'};
+  document.getElementById('ttTitle').textContent=`Terreno [${t.x}, ${t.y}]`;
+  document.getElementById('ttSub').textContent=biomeNames[t.biome]||t.biome;
+  const ent=findEntityAt(t.x,t.y);
+  let extra='';
+  if(ent){
+    if(ent.type==='tree'){ const st=['Muda','Jovem','Adulta','Madura','Morta'][treeStage(ent.obj)]; extra=`<div style="color:#a3e635"><b>Árvore:</b> ${({pine:'Pinheiro',oak:'Carvalho',birch:'Vidoeiro',willow:'Salgueiro'})[ent.obj.species]} — ${st}</div>`; }
+    else if(ent.type==='rock') extra=`<div style="color:#d1d5db"><b>Rocha</b> — minerável</div>`;
   }
-};
+  document.getElementById('ttBody').innerHTML=`
+    <div>Umidade: <b style="color:#38bdf8">${Math.round(t.moist)}%</b></div>
+    <div>Fertilidade: <b style="color:#4ade80">${Math.round(t.fertility)}%</b></div>
+    ${extra}
+  `;
+}
+function hideTooltip(){ document.getElementById('tooltip').style.display='none'; }
