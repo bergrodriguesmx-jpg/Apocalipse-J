@@ -10,7 +10,6 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
 <canvas id="gameCanvas" class="absolute inset-0" style="cursor:crosshair;"></canvas>
 <div id="hitFlash"></div>
 
@@ -36,15 +35,12 @@
         <div class="bar"><div id="staminaBar" style="width:100%;background:linear-gradient(90deg,#065f46,#10b981)"></div></div>
       </div>
     </div>
-    
     <div style="width:1px;height:36px;background:#24303c"></div>
-    <!-- PAINEL DE ARMA -->
     <div class="flex flex-col gap-1" style="font-size:11px">
       <span id="weaponName" style="color:#9aa7b2;font-weight:bold;letter-spacing:.05em">SEM ARMA</span>
       <span style="color:#e5e7eb"><i class="fa-solid fa-box-archive mr-1" style="color:#fbbf24"></i><span id="ammoCount">0</span> balas</span>
     </div>
     <div style="width:1px;height:36px;background:#24303c"></div>
-
     <div class="grid grid-cols-2 gap-1.5" style="font-size:11px">
       <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-tree" style="color:#b45309"></i><span id="invWood" class="font-bold">15</span></div>
       <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-cube" style="color:#9ca3af"></i><span id="invStone" class="font-bold">8</span></div>
@@ -52,7 +48,6 @@
       <div style="background:rgba(10,14,18,.85);padding:5px 9px;border-radius:3px;border:1px solid #1f2a35;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-seedling" style="color:#a3e635"></i><span id="invSeeds" class="font-bold">12</span></div>
     </div>
   </div>
-
   <div class="pz-panel p-3 pointer-events-auto flex items-center gap-3 flex-wrap">
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -111,7 +106,7 @@
 
 <div id="toolbar" class="hidden absolute bottom-4 left-1/2 z-20 pointer-events-none" style="transform:translateX(-50%);max-width:96vw">
   <div class="pz-panel p-2 pointer-events-auto flex items-center gap-1.5" style="overflow-x:auto">
-    <button data-tool="inspect" class="tool-btn pz-btn active"><i class="fa-solid fa-magnifying-glass" style="color:#fbbf24"></i>Inspecionar / Atirar</button>
+    <button data-tool="inspect" class="tool-btn pz-btn active"><i class="fa-solid fa-magnifying-glass" style="color:#fbbf24"></i>Atirar / Inspec.</button>
     <button data-tool="interact" class="tool-btn pz-btn"><i class="fa-solid fa-hand" style="color:#38bdf8"></i>Mover</button>
     <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
     <button data-tool="chop" class="tool-btn pz-btn"><i class="fa-solid fa-axe" style="color:#fb923c"></i>Machado</button>
@@ -126,8 +121,6 @@
     <div style="width:1px;height:34px;background:#24303c;margin:0 4px"></div>
     <button data-tool="spawn_deer" class="tool-btn pz-btn"><i class="fa-solid fa-horse" style="color:#d97706"></i>+Veado</button>
     <button data-tool="spawn_rabbit" class="tool-btn pz-btn"><i class="fa-solid fa-paw" style="color:#d1d5db"></i>+Coelho</button>
-    <button data-tool="spawn_fox" class="tool-btn pz-btn"><i class="fa-solid fa-dog" style="color:#f97316"></i>+Raposa</button>
-    <button data-tool="spawn_wolf" class="tool-btn pz-btn"><i class="fa-solid fa-shield-dog" style="color:#94a3b8"></i>+Lobo</button>
     <button data-tool="spawn_zombie" class="tool-btn pz-btn"><i class="fa-solid fa-skull" style="color:#a3e635"></i>+Zumbi</button>
   </div>
 </div>
@@ -140,7 +133,7 @@
 
 <div id="startScreen">
   <h1>ECO<span>ZUMBI</span><br><span style="font-size:.5em;color:#9aa7b2;letter-spacing:.3em">SOBREVIVÊNCIA E LOOT</span></h1>
-  <p class="tag">Você começa desarmado. Procure por armas e munições brilhando no chão do acampamento inicial. Clique para pegá-las e use a ferramenta "Inspecionar" para atirar nos infectados.</p>
+  <p class="tag">Você começa desarmado. Procure por armas e munições brilhando no chão do acampamento inicial. Clique para pegá-las e use a ferramenta "Atirar" para abater os infectados.</p>
   <button id="startBtn">INICIAR SIMULAÇÃO</button>
 </div>
 
