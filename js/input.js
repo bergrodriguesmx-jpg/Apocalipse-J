@@ -1,6 +1,10 @@
 'use strict';
 EZ.selectWeapon = function(name) {
   const p = EZ.state.player;
+  if (!p.owned.has(name)) {
+    EZ.message('Procure essa arma nas ruínas.');
+    return;
+  }
   if (p.reload > 0) {
     EZ.message('Espere terminar a recarga.');
     return;
@@ -12,7 +16,7 @@ EZ.useTool = function() {
   const s = EZ.state,
     p = s.player,
     m = s.input.mouse,
-    g = EZ.unproject(m.x, m.y),
+    g = EZ.pickTerrain(m.x, m.y),
     t = EZ.tile(g.x, g.y),
     inv = s.inventory;
   if (s.tool === 'eat') {
@@ -27,24 +31,21 @@ EZ.useTool = function() {
     p.target = g;
     return;
   }
-  if (s.tool.startsWith('spawn_')) {
-    const kind = s.tool.slice(6),
-      max = kind === 'zombie' ? EZ.C.maxZombies : EZ.C.maxAnimals,
-      count = s.actors.filter(a => kind === 'zombie' ? a.kind === kind : !['player', 'zombie']
-        .includes(a.kind)).length;
-    if (count >= max) {
-      EZ.message('Limite de criaturas atingido.');
-      return;
-    }
-    if (EZ.freeSpot(g.x, g.y)) s.actors.push(EZ.makeActor(kind, g.x, g.y));
+  if (p.swimming) {
+    EZ.message('Saia da água funda para usar ferramentas.');
     return;
   }
   if (!t || EZ.distance(p, g) > 2.8) {
     EZ.message('Aproxime-se: alcance máximo de 2,8 metros.');
     return;
   }
-  const object = s.world.objects.filter(o => EZ.distance(o, g) < 1).sort((a, b) => EZ.distance(a, g) -
+  const object = EZ.objectsNear(g.x, g.y, 2).filter(o => EZ.distance(o, g) < 1).sort((a, b) => EZ.distance(
+      a, g) -
     EZ.distance(b, g))[0];
+  if ((s.tool === 'chop' || s.tool === 'mine') && p.cooldown > 0) return;
+  if (s.tool === 'chop' || s.tool === 'mine') {
+    p.attackTime = .35;
+  }
   if (s.tool === 'chop') {
     const z = s.actors.find(a => a.kind === 'zombie' && EZ.distance(a, g) < .9 && !a.dead);
     if (z) {
@@ -58,19 +59,21 @@ EZ.useTool = function() {
       return;
     }
     if (object?.kind === 'tree') {
+      p.cooldown = .5;
       object.hp--;
       EZ.sound(120);
       if (object.hp <= 0) {
         inv.wood += 5;
-        s.world.objects = s.world.objects.filter(o => o !== object);
+        EZ.removeObject(object);
       }
     }
   } else if (s.tool === 'mine' && object?.kind === 'rock') {
+    p.cooldown = .5;
     object.hp--;
     EZ.sound(400);
     if (object.hp <= 0) {
       inv.stone += 4;
-      s.world.objects = s.world.objects.filter(o => o !== object);
+      EZ.removeObject(object);
     }
   } else if (s.tool === 'forage') {
     if (object?.kind === 'bush' && object.berries) {
@@ -92,8 +95,14 @@ EZ.useTool = function() {
   } else if (s.tool === 'water') {
     if (t.water) {
       p.thirst = 0;
-      EZ.message('Você bebeu água.');
+      p.waterBottle = 3;
+      EZ.message('Você bebeu e encheu o cantil.');
     } else {
+      if (p.waterBottle <= 0) {
+        EZ.message('Encha o cantil no rio.');
+        return;
+      }
+      p.waterBottle--;
       t.moist = Math.min(100, t.moist + 35);
       EZ.message('Solo irrigado.');
     }
@@ -216,9 +225,7 @@ EZ.bindInput = function() {
   });
   document.querySelectorAll('[data-weapon]').forEach(b => b.onclick = () => EZ.selectWeapon(b.dataset
     .weapon));
-  document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => {
-    s.speed = Number(b.dataset.speed);
-  });
+
   document.getElementById('pause').onclick = EZ.pause;
   document.getElementById('newWorld').onclick = () => EZ.reset((Math.random() * 1e9) | 0);
   document.getElementById('audio').onclick = () => {
