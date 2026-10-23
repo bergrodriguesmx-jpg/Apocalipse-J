@@ -2,10 +2,8 @@
 // Position Based Dynamics: partículas ponderadas por massa + distâncias rígidas.
 // Restrições diagonais limitam flexão; apenas ligações explícitas são cortadas.
 EZ.solveWorld = function(p, r) {
-  p.x = EZ.clamp(p.x, r, EZ.C.size - r);
-  p.y = EZ.clamp(p.y, r, EZ.C.size - r);
-  for (const o of EZ.state.world.objects) {
-    if (o.kind === 'bush' || p.z - r > o.h) continue;
+  for (const o of EZ.objectsNear(p.x, p.y, r + 2)) {
+    if (o.kind === 'bush' || p.z - r > (o.z || 0) + o.h) continue;
     if (o.hw) {
       const qx = EZ.clamp(p.x, o.x - o.hw, o.x + o.hw),
         qy = EZ.clamp(p.y, o.y - o.hd, o.y + o.hd);
@@ -45,14 +43,37 @@ EZ.moveActor = function(a, dx, dy, speed, dt) {
     dx /= n;
     dy /= n;
   }
-  const water = EZ.tile(a.x, a.y)?.water;
-  speed *= water ? .45 : 1;
-  const k = 1 - Math.exp(-10 * dt);
+  const depth = EZ.depthAt(a.x, a.y),
+    humanoid = a.kind === 'player' || a.kind === 'zombie';
+  a.swimming = depth > (humanoid ? 1.05 : .5);
+  a.wading = depth > .1 && !a.swimming;
+  if (a.swimming) speed = a.kind === 'zombie' ? .48 : (a.stamina < 1 ? .48 : 1.15);
+  else if (a.wading) speed *= .65;
+  const k = 1 - Math.exp(-9 * dt);
   a.vx += (dx * speed - a.vx) * k;
   a.vy += (dy * speed - a.vy) * k;
+  const ox = a.x,
+    oy = a.y,
+    oldGround = EZ.groundAt(ox, oy);
   a.x += a.vx * dt;
   a.y += a.vy * dt;
+  const travel = Math.hypot(a.x - ox, a.y - oy),
+    rise = EZ.groundAt(a.x, a.y) - oldGround;
+  if (!EZ.tile(a.x, a.y) || (travel > .00001 && rise / travel > 1.35)) {
+    a.x = ox;
+    a.y = oy;
+    a.vx = a.vy = 0;
+  } else if (rise > 0) {
+    const slope = 1 / (1 + rise / Math.max(travel, .0001));
+    a.x = ox + (a.x - ox) * slope;
+    a.y = oy + (a.y - oy) * slope;
+  }
   EZ.solveWorld(a, a.radius);
+  const bed = EZ.groundAt(a.x, a.y),
+    d = Math.max(0, -bed);
+  a.swimming = d > (humanoid ? 1.05 : .5);
+  a.wading = d > .1 && !a.swimming;
+  a.z = a.swimming ? Math.max(bed, humanoid ? -1.05 : -.35) : bed;
   const v = Math.hypot(a.vx, a.vy);
   a.phase += v * dt * 6;
   if (v > .05) a.angle = Math.atan2(a.vy, a.vx);
@@ -89,7 +110,7 @@ EZ.pose = function(a) {
   const point = (side, forward, z) => ({
     x: a.x - f * side + c * forward,
     y: a.y + c * side + f * forward,
-    z
+    z: z + (a.z || 0)
   });
   return {
     hip: point(0, 0, .86),
@@ -210,7 +231,13 @@ EZ.stepRagdolls = function(dt) {
       p.ox = p.x;
       p.oy = p.y;
       p.oz = p.z;
-      p.vz -= EZ.C.gravity * dt;
+      const submerged = p.z < 0 && EZ.depthAt(p.x, p.y) > 0;
+      p.vz -= EZ.C.gravity * (submerged ? .35 : 1) * dt;
+      if (submerged) {
+        p.vx *= Math.exp(-3 * dt);
+        p.vy *= Math.exp(-3 * dt);
+        p.vz *= Math.exp(-3 * dt);
+      }
       p.vx *= Math.exp(-.15 * dt);
       p.vy *= Math.exp(-.15 * dt);
       p.x += p.vx * dt;
@@ -236,7 +263,7 @@ EZ.stepRagdolls = function(dt) {
         b.z -= dz * v * b.inv;
       }
       for (const p of ns) {
-        p.z = Math.max(p.r, p.z);
+        p.z = Math.max(EZ.groundAt(p.x, p.y) + p.r, p.z);
         EZ.solveWorld(p, p.r);
       }
     }
@@ -246,7 +273,7 @@ EZ.stepRagdolls = function(dt) {
       p.vx = (p.x - p.ox) / dt;
       p.vy = (p.y - p.oy) / dt;
       p.vz = (p.z - p.oz) / dt;
-      if (p.z <= p.r + .002) {
+      if (p.z <= EZ.groundAt(p.x, p.y) + p.r + .002) {
         p.vx *= Math.exp(-13 * dt);
         p.vy *= Math.exp(-13 * dt);
         p.vz = incoming < -.8 ? -incoming * .12 : Math.max(0, p.vz) * .1;
