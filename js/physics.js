@@ -1,8 +1,4 @@
-/* ============================================================
-   Física de corpos, colisão e separação
-   ============================================================ */
-
-function makeBody(x, y, radius, mass){ return { x, y, vx:0, vy:0, radius, mass, facing:0, walkPhase:Math.random()*6, attackCd:0 }; }
+function makeBody(x, y, radius, mass){ return { x, y, vx:0, vy:0, radius, mass, facing:0, walkPhase:Math.random()*6, attackCd:0, isSwimming: false }; }
 
 function solidsNear(x, y, range){
   const out = [];
@@ -21,15 +17,17 @@ function solidsNear(x, y, range){
 function resolveCollisions(body){
   const range = body.radius + 2;
   const t = tileAt(Math.floor(body.x), Math.floor(body.y));
-  if(t && t.water===2){
-    let best=null, bd=1e9;
-    for(let dx=-2;dx<=2;dx++) for(let dy=-2;dy<=2;dy++){
-      const nt = tileAt(Math.floor(body.x)+dx, Math.floor(body.y)+dy);
-      if(nt && nt.water!==2){ const dd=dx*dx+dy*dy; if(dd<bd){bd=dd;best=nt;} }
-    }
-    if(best){ const a=Math.atan2(best.y-body.y, best.x-body.x); body.vx += Math.cos(a)*2; body.vy += Math.sin(a)*2; }
+  
+  // --- NOVO: MECÂNICA DE NATAÇÃO ---
+  if(t && t.water > 0){
+    body.isSwimming = true;
+    // Atrito da água deixa o movimento mais lento
+    body.vx *= 0.85; 
+    body.vy *= 0.85;
+  } else {
+    body.isSwimming = false;
   }
-  if(t && t.water===1){ body.vx*=0.85; body.vy*=0.85; }
+
   for(const s of solidsNear(body.x, body.y, range)){
     if(s.kind==='circle'){
       const dx=body.x-s.x, dy=body.y-s.y;
@@ -57,6 +55,7 @@ function resolveCollisions(body){
       }
     }
   }
+  
   const cx0=Math.floor((body.x-2)/CS), cx1=Math.ceil((body.x+2)/CS);
   const cy0=Math.floor((body.y-2)/CS), cy1=Math.ceil((body.y+2)/CS);
   for(let cx=cx0;cx<=cx1;cx++) for(let cy=cy0;cy<=cy1;cy++){
@@ -99,16 +98,26 @@ function separateBodies(list){
 }
 
 function stepBody(body, ax, ay, maxV, dt){
+  if (body.isSwimming) maxV *= 0.45; // Fica muito mais lento na água
+  
   body.vx += ax*dt; body.vy += ay*dt;
   const fr = Math.exp(-FRICTION*dt);
   body.vx *= fr; body.vy *= fr;
   const sp = Math.hypot(body.vx, body.vy);
   if(sp>maxV){ body.vx = body.vx/sp*maxV; body.vy = body.vy/sp*maxV; }
   body.x += body.vx*dt; body.y += body.vy*dt;
+  
   resolveCollisions(body);
+  
   if(sp>0.15){ body.facing = Math.atan2(body.vy, body.vx); body.walkPhase += sp*dt*6; }
-  if(sp>1.5 && Math.random()<0.15*dt*60){
+  
+  if(sp>1.5 && !body.isSwimming && Math.random()<0.15*dt*60){
     const iso=gridToIso(body.x,body.y);
     particles.push({kind:'dust', sx:iso.x*zoom+camX+camOffsetX+(Math.random()-0.5)*10, sy:iso.y*zoom+camY+camOffsetY+TH*0.4*zoom, v:0.3, drift:Math.cos(wind.angle)*wind.speed, life:20});
+  }
+  // Partículas de água ao nadar
+  if(sp>1.0 && body.isSwimming && Math.random()<0.2*dt*60){
+    const iso=gridToIso(body.x,body.y);
+    particles.push({kind:'water_splash', sx:iso.x*zoom+camX+camOffsetX, sy:iso.y*zoom+camY+camOffsetY+TH*0.5*zoom, v:0.2, drift:0, life:15});
   }
 }
