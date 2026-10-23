@@ -19,10 +19,12 @@ function findZombieNear(gx, gy, range){
 function bindInput(){
   window.addEventListener('keydown', e=>{ keys[e.code]=true; });
   window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+  
   canvas.addEventListener('mousedown', e=>{
     if(!audioCtx) try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){}
     if(e.button===0){ isDragging=true; dragMoved=false; dragStart={x:e.clientX,y:e.clientY,ox:camOffsetX,oy:camOffsetY}; }
   });
+  
   window.addEventListener('mousemove', e=>{
     if(isDragging){
       const dx=e.clientX-dragStart.x, dy=e.clientY-dragStart.y;
@@ -34,6 +36,7 @@ function bindInput(){
     if(t){ hoveredTile=t; updateTooltip(e.clientX,e.clientY); }
     else { hoveredTile=null; hideTooltip(); }
   });
+  
   window.addEventListener('mouseup', ()=>{ isDragging=false; });
 
   canvas.addEventListener('click', e=>{
@@ -42,7 +45,7 @@ function bindInput(){
     const gx=Math.floor(g.x), gy=Math.floor(g.y);
     const tile=tileAt(gx,gy);
 
-    // --- NOVO: PRIORIDADE 1: PEGAR ITEM DO CHÃO ---
+    // PEGAR ITEM DO CHÃO
     let pickedLoot = null;
     for (let i = lootDrops.length - 1; i >= 0; i--) {
       const l = lootDrops[i];
@@ -59,19 +62,19 @@ function bindInput(){
         snd(400, 'sine', 0.1, 0.15);
       } else {
         player.equippedWeapon = pickedLoot.type;
-        player.ammo = pickedLoot.amount * 10; // Dá munição grátis ao pegar
+        player.ammo = pickedLoot.amount * 10;
         snd(300, 'triangle', 0.15, 0.2);
       }
-      return; // Encerra o clique aqui após pegar
+      return;
     }
 
-    // --- PRIORIDADE 2: ATIRAR ---
+    // ATIRAR
     if (player.equippedWeapon && (activeTool === 'inspect' || activeTool === 'interact')) {
       fireWeapon(gx, gy);
       return;
     }
 
-    // --- PRIORIDADE 3: AÇÕES DE FERRAMENTAS ---
+    // AÇÕES DAS FERRAMENTAS
     if(!tile && activeTool !== 'inspect') return; 
     const ent=findEntityAt(gx,gy);
 
@@ -126,4 +129,30 @@ function bindInput(){
     }
   });
   
-  // ... (Restante do código de wheel, botões de pause, tool e etc continuam iguais)
+  canvas.addEventListener('wheel', e=>{ e.preventDefault(); zoom=clamp(zoom*(e.deltaY<0?1.08:0.92), MIN_ZOOM, MAX_ZOOM); }, {passive:false});
+  
+  document.querySelectorAll('.tool-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); activeTool=btn.dataset.tool;
+    });
+  });
+  
+  document.getElementById('btnPause').addEventListener('click', ()=>{
+    gameState=gameState==='playing'?'paused':'playing';
+    document.getElementById('btnPause').classList.toggle('active',gameState==='paused');
+    document.getElementById('btnPause').innerHTML=gameState==='paused'?'<i class="fa-solid fa-play" style="color:#34d399"></i>':'<i class="fa-solid fa-pause" style="color:#fbbf24"></i>';
+  });
+  
+  const setSpeed=id=>{ ['btnSpeed1','btnSpeed2','btnSpeed5'].forEach(b=>document.getElementById(b).classList.remove('active')); document.getElementById(id).classList.add('active'); };
+  document.getElementById('btnSpeed1').addEventListener('click', ()=>{speed=1;setSpeed('btnSpeed1');});
+  document.getElementById('btnSpeed2').addEventListener('click', ()=>{speed=2;setSpeed('btnSpeed2');});
+  document.getElementById('btnSpeed5').addEventListener('click', ()=>{speed=5;setSpeed('btnSpeed5');});
+  document.getElementById('btnRegen').addEventListener('click', ()=>resetWorld(true));
+  
+  document.getElementById('btnAudio').addEventListener('click', ()=>{
+    muted=!muted;
+    document.getElementById('btnAudio').classList.toggle('text-red-400',muted);
+    document.getElementById('btnAudio').innerHTML=muted?'<i class="fa-solid fa-volume-xmark"></i>':'<i class="fa-solid fa-volume-high"></i>';
+  });
+}
