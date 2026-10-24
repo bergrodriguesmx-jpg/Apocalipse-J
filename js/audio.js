@@ -1,11 +1,26 @@
-function snd(freq,type,dur,vol){
-  if(muted) return;
-  try{
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type=type||'sine'; o.frequency.value=freq;
-    g.gain.setValueAtTime(vol||0.1, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+(dur||0.1));
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+(dur||0.1));
-  }catch(e){}
-}
+'use strict';
+EZ.unlockAudio = function() {
+  try {
+    if (!EZ.audio) EZ.audio = new(window.AudioContext || window.webkitAudioContext)();
+    if (EZ.audio.state === 'suspended') EZ.audio.resume().catch(() => {});
+  } catch {}
+};
+EZ.sound = function(freq = 150, duration = .08) {
+  if (EZ.state.muted || !EZ.audio) return;
+  const c = EZ.audio,
+    o = c.createOscillator(),
+    g = c.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(freq, c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(40, c.currentTime + duration);
+  g.gain.setValueAtTime(.035, c.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + duration);
+  o.connect(g);
+  g.connect(c.destination);
+  o.start();
+  o.stop(c.currentTime + duration);
+  o.onended = () => {
+    o.disconnect();
+    g.disconnect();
+  };
+};
